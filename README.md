@@ -33,3 +33,11 @@ Add an object to `js/songs.js`. Write each section line as bars separated by `|`
 ```
 
 Lyrics are intentionally not included (copyright).
+
+## Single-file version
+
+`cifra-online.html` is the whole site in one file (CSS and JS included). Download it and double-click to open, no server needed. Rebuild it after changing the source files:
+
+```bash
+python3 build.py
+```
