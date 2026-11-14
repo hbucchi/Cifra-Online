@@ -6,15 +6,7 @@
  * Tempo changes use WSOLA time-stretching (below), so the key stays the same.
  */
 
-const JAM_SCALES = {
-  "min-pent": { name: "Minor pentatonic", iv: [0, 3, 5, 7, 10] },
-  "blues": { name: "Blues scale", iv: [0, 3, 5, 6, 7, 10] },
-  "minor": { name: "Natural minor", iv: [0, 2, 3, 5, 7, 8, 10] },
-  "dorian": { name: "Dorian", iv: [0, 2, 3, 5, 7, 9, 10] },
-  "maj-pent": { name: "Major pentatonic", iv: [0, 2, 4, 7, 9] },
-  "major": { name: "Major scale", iv: [0, 2, 4, 5, 7, 9, 11] },
-  "mixolydian": { name: "Mixolydian", iv: [0, 2, 4, 5, 7, 9, 10] }
-};
+const JAM_SCALES = SCALE_LIBRARY; // shared definitions (js/scales.js)
 
 /*
  * WSOLA (Waveform-Similarity Overlap-Add) time-stretching.
@@ -153,7 +145,8 @@ function renderJam() {
     key: saved.key ?? 9,
     tempo: saved.tempo ?? 1,
     scale: saved.scale || null,
-    view: saved.view || "neck",
+    view: ["neck", "box", "shapes"].includes(saved.view) ? saved.view : "shapes",
+    shape: saved.shape ?? 0,
     labels: saved.labels || "names"
   };
   const save = () => store.set("jam", st);
@@ -190,9 +183,10 @@ function renderJam() {
 
     <section class="panel">
       <div class="neck-tools">
-        <div class="chips">${[["neck", "Across the neck"], ["box", "One position"]].map(([v, t]) => `<button class="chip" data-view="${v}">${t}</button>`).join("")}</div>
+        <div class="chips">${[["neck", "Across the neck"], ["box", "One position"], ["shapes", "Shapes"]].map(([v, t]) => `<button class="chip" data-view="${v}">${t}</button>`).join("")}</div>
         <div class="chips">${[["names", "Note names"], ["intervals", "Intervals"], ["fingers", "Fingers ✋"]].map(([v, t]) => `<button class="chip" data-lab="${v}">${t}</button>`).join("")}</div>
       </div>
+      <div id="jamShapes"></div>
       <div id="jamNeck"></div>
       <div class="fb-legend" id="jamLegend"></div>
     </section>
@@ -232,21 +226,55 @@ function renderJam() {
   function drawNeck(currentChord) {
     const sc = JAM_SCALES[scaleFor()];
     const root = st.key;
-    const cells = schoolShape(root, sc.iv, st.view);
-    const fingers = schoolFingers(cells);
-    const spell = spellSet(root, sc.iv, false);
+    const iv = [...sc.iv].sort((a, b) => a - b);
+    const spell = spellSet(root, iv, false);
     const chordPcs = currentChord ? chordTones(currentChord) : [];
     const dots = new Map();
+    let cells, inShape = null, band = null;
+    if (st.view === "neck") cells = acrossNeck(root, iv);
+    else {
+      const shapes = scaleShapes(root, iv);
+      const idx = st.view === "box" ? 0 : Math.min(st.shape, shapes.length - 1);
+      const sel = shapes[idx];
+      band = [sel.lo, sel.hi];
+      if (st.view === "box") cells = sel.cells;
+      else {
+        // Shapes: every scale note on the neck, the selected hand position in front.
+        const own = new Set(sel.cells.map(c => c.s + ":" + c.f));
+        inShape = k => own.has(k);
+        cells = [...sel.cells];
+        for (let s = 0; s < 6; s++) for (let f = 0; f <= 15; f++) {
+          const m = STANDARD_TUNING[s] + f;
+          if (iv.some(i => pc(root + i) === pc(m)) && !own.has(s + ":" + f)) cells.push({ s, f, m, finger: null });
+        }
+      }
+      $("#jamShapes").innerHTML = st.view === "shapes" ? `
+        <div class="fb-pos"><span class="tool-label">Shape</span>
+          <button class="chip" data-jshape="prev">◀</button>
+          ${shapes.map((sh, i) => `<button class="chip ${i === idx ? "on" : ""}" data-jshape="${i}">${sh.n} <small>fr ${sh.lo}–${sh.hi}</small></button>`).join("")}
+          <button class="chip" data-jshape="next">▶</button></div>
+        <p class="hint">✋ Hand on frets <strong>${sel.lo}–${sel.hi}</strong> (the highlighted band). Faded notes belong to the neighbouring shapes.</p>` : "";
+    }
+    if (st.view !== "shapes") $("#jamShapes").innerHTML = "";
     cells.forEach(c => {
+      const k = c.s + ":" + c.f;
       const i = pc(c.m - root);
-      const label = st.labels === "fingers" ? String(c.f === 0 ? 0 : fingers.get(c.s + ":" + c.f))
+      const mine = !inShape || inShape(k);
+      const label = st.labels === "fingers" && mine && c.finger !== null ? String(c.finger)
         : st.labels === "intervals" ? SCALE_INTERVALS[i] : spell.get(pc(c.m));
       const target = chordPcs.includes(pc(c.m));
-      dots.set(c.s + ":" + c.f, { label, cls: "role-" + intervalRole(i) + (target ? " target" : chordPcs.length ? " dim" : "") + (st.labels === "fingers" ? " finger" : "") });
+      let cls = "role-" + intervalRole(i);
+      if (!mine) cls += " faded";
+      else if (target) cls += " target";
+      else if (chordPcs.length) cls += " dim";
+      if (st.labels === "fingers" && mine) cls += " finger";
+      dots.set(k, { label, cls });
     });
-    $("#jamNeck").innerHTML = miniNeckHTML(dots);
-    $("#jamLegend").innerHTML = `<span class="legend-title"><strong>${spell.get(root)} ${sc.name}</strong>: ${sc.iv.map(i => spell.get(pc(root + i))).join(" · ")}</span>
-      <span><i class="fb-dot role-root target"></i> notes of the chord playing now — great places to land</span>`;
+    $("#jamNeck").innerHTML = miniNeckHTML(dots, 15, band);
+    const chordNotes = currentChord ? chordPcs.map(p => spell.get(p) || noteName(p, keyFlats())).join(" · ") : "";
+    $("#jamLegend").innerHTML = `<span class="legend-title"><strong>${spell.get(root)} ${sc.name}</strong>: ${iv.map(i => spell.get(pc(root + i))).join(" · ")}</span>
+      <span><i class="fb-dot role-root target"></i> <strong>Target notes</strong> — the notes of the chord playing now${currentChord ? ` (${prettyChord(currentChord)} = ${chordNotes})` : ""}.
+      Landing on them sounds strong and "in tune with the band"; the other scale notes (dimmer) are passing notes that move you between targets.</span>`;
   }
 
   function chordTones(name) {
@@ -310,13 +338,18 @@ function renderJam() {
   };
   app.addEventListener("click", onClick);
   function onClick(e) {
-    const b = e.target.closest("[data-track],[data-key],[data-scale],[data-view],[data-lab],#jamRandom,#jamTempoReset");
+    const b = e.target.closest("[data-track],[data-key],[data-scale],[data-view],[data-lab],[data-jshape],#jamRandom,#jamTempoReset");
     if (!b) return;
+    if (b.dataset.jshape) {
+      const n = scaleShapes(st.key, JAM_SCALES[scaleFor()].iv).length, v = b.dataset.jshape;
+      st.shape = v === "prev" ? (st.shape + n - 1) % n : v === "next" ? (st.shape + 1) % n : +v;
+      save(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0)); return;
+    }
     if (b.dataset.track) { st.track = b.dataset.track; save(); restart(false); return; }
     if (b.dataset.key) { st.key = +b.dataset.key; save(); restart(); return; }
     if (b.id === "jamRandom") { st.key = Math.floor(Math.random() * 12); save(); restart(); return; }
     if (b.id === "jamTempoReset") { st.tempo = 1; save(); restart(); return; }
-    if (b.dataset.scale) { st.scale = b.dataset.scale; save(); drawControls(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0)); return; }
+    if (b.dataset.scale) { st.scale = b.dataset.scale; st.shape = 0; save(); drawControls(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0)); return; }
     if (b.dataset.view) { st.view = b.dataset.view; save(); drawControls(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0)); return; }
     if (b.dataset.lab) { st.labels = b.dataset.lab; save(); drawControls(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0)); }
   }

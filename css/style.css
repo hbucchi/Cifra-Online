@@ -420,3 +420,9 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
   .nav { width: 100%; overflow-x: auto; scrollbar-width: none; }
   .nav a { padding: 6px 10px; font-size: .92rem; white-space: nowrap; }
 }
+
+/* Shapes: the band where the hand sits */
+.fb-cell.in-band { background: rgba(253, 230, 138, .16); }
+.fb-row:first-child .fb-cell.in-band { box-shadow: inset 0 3px 0 rgba(253, 230, 138, .9); }
+.fb-row:nth-last-child(2) .fb-cell.in-band { box-shadow: inset 0 -3px 0 rgba(253, 230, 138, .9); }
+.fb-pos .chip small { opacity: .7; font-weight: 500; }

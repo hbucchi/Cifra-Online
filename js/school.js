@@ -210,18 +210,19 @@ const LESSONS = {
   },
 
   "major-three-per-string": {
-    title: "Major scale: three notes per string",
+    title: "Major scale: your first shape",
     minutes: 20,
-    goals: ["Play two octaves of G major", "Improvise over a pop progression"],
+    goals: ["Play two octaves of G major in one hand position", "Improvise over a pop progression"],
     theory: `
-      <p>To cover more of the neck, guitarists play the major scale with <strong>three notes on every string</strong>. Each string uses one of two finger patterns: <strong>1-3-4</strong> (whole, whole steps) or <strong>1-2-4</strong> (half, whole step).</p>
+      <p>A <strong>shape</strong> (or position) is a place on the neck where your hand stays still and reaches every note of the scale across all six strings. For G major, put your <strong>index finger on fret 2</strong> and use <strong>one finger per fret</strong>: index = fret 2, middle = 3, ring = 4, pinky = 5. You get two octaves of G major without moving your hand.</p>
+      <p>Each string has 2 or 3 notes. Switch the neck to <em>Fingers ✋</em> to see which finger plays each note. The major scale has 5 shapes along the neck — once this one is comfortable, explore the others in the <a href="#/tuner">Fretboard</a> (Scale → Shapes).</p>
       <p>The backing track uses a classic pop progression built from the major key's own chords: <strong>I – ii – vi – IV</strong> (in G: G – Am – Em – C). Every note of the G major scale fits over it.</p>
       <div class="deep-dive"><strong>Where chords come from.</strong> Stack every other note of the scale: G-B-D (G major), A-C-E (A minor), B-D-F♯ (B minor), C-E-G (C), D-F♯-A (D), E-G-B (E minor), F♯-A-C (F♯ dim). Songs in G mostly use these 7 chords — that's why the scale fits them all.</div>`,
     neck: { type: "scale", scale: "major", root: 7, view: "box", labels: "fingers", followTrack: true },
     practice: {
       track: "pop-major", key: 7, scale: "major",
       steps: [
-        "Play the pattern up and down at 60 BPM with the metronome (fingers 1-3-4 / 1-2-4).",
+        "Play the shape up and down at 60 BPM with the metronome, one finger per fret (index on fret 2).",
         "Start the backing track. Play the notes of each chord when it comes: G on the G chord, D on the D chord…",
         "Improvise phrases that end on G (the root).",
         "Change the key in the player and move the pattern."
@@ -287,7 +288,7 @@ const LESSONS = {
         <tr><td>Folk (major)</td><td>Major pentatonic, major scale</td></tr>
       </table>
       <p>The neck below shows the scale <strong>across the whole neck</strong> — every pitch once — so you can connect the boxes you know and travel up and down while you play.</p>
-      <div class="deep-dive"><strong>Next steps.</strong> Learn the other 4 pentatonic boxes (Fretboard &amp; Tuner → Scale → One position, move the start position), try bends and vibrato, and transcribe short melodies by ear.</div>`,
+      <div class="deep-dive"><strong>Next steps.</strong> Learn the other 4 pentatonic shapes (Fretboard → Scale → Shapes, or the Shapes view in the <a href="#/jam">Jam room</a>), try bends and vibrato, and transcribe short melodies by ear.</div>`,
     neck: { type: "scale", scale: "min-pent", root: 9, view: "neck", labels: "names", followTrack: true },
     practice: {
       track: "minor-groove", key: 9, scale: "min-pent", free: true,
@@ -313,71 +314,29 @@ const doneLessons = () => store.get("school:done", []);
 
 /* ---------- Scale shapes (standard tuning) ---------- */
 
-// Returns [{s, f, m}] for a scale shape. view: "box" (2–3 notes/string from the root
-// on the 6th string), "octave" (root to root), "neck" (whole range, each pitch once).
+// Scale cells for a lesson view, from the shared js/scales.js:
+// "box" = the root's shape (hand position), "octave" = root to root, "neck" = across the neck.
 function schoolShape(rootPc, iv, view) {
-  const T = STANDARD_TUNING, FRETS = 15;
-  const pcs = iv.map(i => pc(rootPc + i));
-  const cells = [];
-  if (view === "neck") {
-    const seq = [];
-    for (let m = T[0]; m <= T[5] + FRETS; m++) if (pcs.includes(pc(m))) seq.push(m);
-    const per = Math.ceil(seq.length / 6);
-    let s = 0, n = 0;
-    for (const m of seq) {
-      while (s < 5 && (n >= per || m - T[s] > FRETS) && m - T[s + 1] >= 0) { s++; n = 0; }
-      const f = m - T[s];
-      if (f >= 0 && f <= FRETS) { cells.push({ s, f, m }); n++; }
-    }
-    return cells;
-  }
-  const per = iv.length >= 7 ? 3 : 2;
-  let f0 = pc(rootPc - T[0]);                // root on the 6th string (0–11)
-  if (f0 === 0 && view === "box" && iv.length < 7) f0 = 0;
-  const start = T[0] + f0;
-  const limit = view === "octave" ? start + 12 : start + 40;
-  const seq = [];
-  for (let m = start; m <= limit; m++) if (pcs.includes(pc(m))) seq.push(m);
-  let k = 0;
-  for (let s = 0; s < 6 && k < seq.length; s++) {
-    let placed = 0;
-    while (placed < per && k < seq.length) {
-      const f = seq[k] - T[s];
-      if (f < 0) { k++; continue; }
-      if (f > FRETS) break;
-      cells.push({ s, f, m: seq[k] }); k++; placed++;
-    }
-  }
-  return cells;
+  const sorted = [...iv].sort((a, b) => a - b);
+  if (view === "neck") return acrossNeck(rootPc, sorted);
+  if (view === "octave") return oneOctave(rootPc, sorted);
+  return scaleShapes(rootPc, sorted)[0].cells;
 }
 
-// Finger per string: one finger per fret when it fits, otherwise in order.
+// Finger for each cell (computed by js/scales.js).
 function schoolFingers(cells) {
-  const out = new Map();
-  for (let s = 0; s < 6; s++) {
-    const fs = cells.filter(c => c.s === s && c.f > 0).map(c => c.f).sort((a, b) => a - b);
-    if (!fs.length) continue;
-    const first = fs[0], last = fs[fs.length - 1];
-    fs.forEach((f, k) => {
-      let fg;
-      if (last - first <= 3) fg = f - first + 1;
-      else if (fs.length >= 4) fg = Math.min(4, k + 1);
-      else if (fs.length === 3) fg = k === 0 ? 1 : k === 2 ? 4 : (f - first <= last - f ? 2 : 3);
-      else fg = k === 0 ? 1 : 4;
-      out.set(s + ":" + f, fg);
-    });
-  }
-  return out;
+  return new Map(cells.map(c => [c.s + ":" + c.f, c.finger]));
 }
 
 /* ---------- Mini neck (display only, tap to hear) ---------- */
-function miniNeckHTML(dots, frets = 15) {
+function miniNeckHTML(dots, frets = 15, band = null) {
   const rows = [];
   for (let s = 5; s >= 0; s--) {
     const cells = [];
     for (let f = 0; f <= frets; f++) {
       const d = dots.get(s + ":" + f);
-      cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""}" data-s="${s}" data-f="${f}">${d ? `<span class="fb-dot ${d.cls}">${d.label}</span>` : ""}</div>`);
+      const inBand = band && f > 0 && f >= band[0] && f <= band[1];
+      cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""}" data-s="${s}" data-f="${f}">${d ? `<span class="fb-dot ${d.cls}">${d.label}</span>` : ""}</div>`);
     }
     rows.push(`<div class="fb-row" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">
       <div class="fb-tune"><span class="fb-note mini">${noteName(STANDARD_TUNING[s], false)}</span></div>
