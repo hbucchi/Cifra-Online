@@ -201,6 +201,7 @@ function renderTuner() {
     scaleRoot: saved.scaleRoot ?? 9,
     scaleType: saved.scaleType ?? "min-pent",
     scalePos: saved.scalePos ?? null, // hand position for scale fingering (fret of finger 1)
+    scaleView: saved.scaleView || "pattern", // "pattern" | "octave" | "all"
     labels: saved.labels || "names",
     showAll: saved.showAll ?? false,
     voicing: 0,
@@ -211,7 +212,7 @@ function renderTuner() {
   const FRETS = 15;
   const save = () => store.set("fb", {
     tuning: st.tuning, mode: st.mode, chordRoot: st.chordRoot, chordType: st.chordType,
-    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, labels: st.labels, showAll: st.showAll
+    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, scaleView: st.scaleView, labels: st.labels, showAll: st.showAll
   });
 
   app.innerHTML = `
@@ -302,6 +303,61 @@ function renderTuner() {
     if (pos === 0) return f <= 4 ? f : null;
     return f >= pos && f <= pos + 3 ? f - pos + 1 : null;
   }
+  /*
+   * A clean scale pattern instead of every note on the neck:
+   * start on the root on the 6th string (at/after the chosen position) and
+   * climb the scale, placing N notes on each string before moving to the next:
+   * 3 per string for 7-note scales, 2 per string for pentatonic/blues.
+   * "octave" stops after one octave (each note once, root to root).
+   */
+  function scalePattern(a) {
+    if (st.mode !== "scale" || st.scaleView === "all") return null;
+    const sorted = [...a.iv].sort((x, y) => x - y);
+    const perString = sorted.length >= 7 ? 3 : 2;
+    const pos = scalePos();
+    // Pattern: start on the first scale note at/after the position (each
+    // position starts on a different degree, like the 7 positions of a major scale).
+    // One octave: start on the root, so it runs root → root.
+    const wanted = st.scaleView === "octave" ? (m => pc(m) === a.root) : (m => a.pcs.includes(pc(m)));
+    let f0 = null;
+    for (let f = pos; f <= FRETS - 2; f++) if (wanted(st.tuning[0] + f)) { f0 = f; break; }
+    if (f0 === null) for (let f = 0; f <= FRETS; f++) if (wanted(st.tuning[0] + f)) { f0 = f; break; }
+    const start = st.tuning[0] + f0;
+    const limit = st.scaleView === "octave" ? start + 12 : start + 48;
+    const seq = [];
+    for (let m = start; m <= limit; m++) if (a.pcs.includes(pc(m))) seq.push(m);
+    const cells = [];
+    let k = 0;
+    for (let s = 0; s < 6 && k < seq.length; s++) {
+      let placed = 0;
+      while (placed < perString && k < seq.length) {
+        const f = seq[k] - st.tuning[s];
+        if (f < 0) { k++; continue; }       // too low for this string (odd tunings)
+        if (f > FRETS) break;               // off the neck: try the next string
+        cells.push({ s, f, m: seq[k] });
+        k++; placed++;
+      }
+    }
+    // Fingering per string: first note finger 1, last note finger 4 when the
+    // notes are 3+ frets apart, otherwise one finger per fret (2 frets apart → 1 & 3).
+    const fingerOf = new Map();
+    for (let s = 0; s < 6; s++) {
+      const fs = cells.filter(c => c.s === s && c.f > 0).map(c => c.f).sort((x, y) => x - y);
+      if (!fs.length) continue;
+      const first = fs[0], last = fs[fs.length - 1];
+      fs.forEach(f => {
+        let fg = f - first + 1;
+        if (fg > 4 || (f === last && last - first >= 3)) fg = f === last ? 4 : 3;
+        fingerOf.set(s + ":" + f, fg);
+      });
+    }
+    return {
+      cells, perString,
+      has: (s, f) => cells.some(c => c.s === s && c.f === f),
+      finger: (f, s) => (f === 0 ? 0 : fingerOf.get(s + ":" + f) || 1)
+    };
+  }
+
   const fingerText = v => v.fingers === 0 ? "No fingers — all open"
     : `${v.fingers} finger${v.fingers === 1 ? "" : "s"}` +
       (v.barreCount ? ` · ${v.barreCount === 1 ? "1 finger presses several notes" : v.barreCount + " fingers press several notes"}` : "");
@@ -377,14 +433,21 @@ function renderTuner() {
       </div>
       <p class="fb-formula">${formula}
         ${isChord ? `<button class="btn small" id="playChord">▶ Play</button>` : `<button class="btn small" id="playScale">▶ Play scale</button>`}</p>
-      ${!isChord && st.labels === "fingers" ? positionsHTML() : ""}
+      ${isChord ? "" : `<div class="fb-pos"><span class="tool-label">View</span>
+        ${[["pattern", `Pattern (${[...a.iv].length >= 7 ? 3 : 2} notes per string)`], ["octave", "One octave"], ["all", "Whole neck"]]
+          .map(([id, l]) => `<button class="chip ${st.scaleView === id ? "on" : ""}" data-view="${id}">${l}</button>`).join("")}</div>`}
+      ${!isChord && (st.scaleView !== "all" || st.labels === "fingers") ? positionsHTML() : ""}
       ${isChord ? "" : scaleChordsHTML(a)}
     `;
+    p.querySelectorAll("[data-view]").forEach(b => b.onclick = () => {
+      st.scaleView = b.dataset.view; st.custom = null; st.activeString = null; save(); drawPickers(); drawFretboard(); drawShapeInfo();
+    });
     p.querySelectorAll("[data-pos]").forEach(b => b.onclick = () => {
       const v = b.dataset.pos;
       const cur = scalePos();
       st.scalePos = v === "prev" ? Math.max(0, cur - 1) : v === "next" ? Math.min(12, cur + 1) : Number(v);
-      save(); drawPickers(); drawFretboard();
+      st.custom = null; st.activeString = null;
+      save(); drawPickers(); drawFretboard(); drawShapeInfo();
     });
     p.querySelectorAll("[data-root]").forEach(b => b.onclick = () => {
       if (isChord) st.chordRoot = Number(b.dataset.root); else { st.scaleRoot = Number(b.dataset.root); st.scalePos = null; }
@@ -409,7 +472,9 @@ function renderTuner() {
     });
     if ($("#playChord")) $("#playChord").onclick = () => { if (voicings[st.voicing]) playVoicing(voicings[st.voicing]); };
     if ($("#playScale")) $("#playScale").onclick = () => {
-      // Start from the lowest root on the 6th string, go up one octave.
+      const pat = scalePattern(a);
+      if (pat) { GuitarAudio.playSequence(pat.cells.map(c => c.m), 0.24); return; }
+      // Whole neck: start from the lowest root on the 6th string, go up one octave.
       let start = st.tuning[0];
       while (pc(start) !== st.scaleRoot) start++;
       const seq = [...a.iv].sort((x, y) => x - y).map(i => start + i).concat(start + 12);
@@ -423,6 +488,7 @@ function renderTuner() {
     const flats = a ? a.flats : false;
     const v = currentShape();
     const fing = v ? autoFingering(v.frets) : null;
+    const pat = a ? scalePattern(a) : null;
     const fb = $("#fb");
     fb.classList.toggle("lefty", prefs.lefty);
     const rows = [];
@@ -436,9 +502,10 @@ function renderTuner() {
         let cls = "";
         let label = nameIn(a, p);
         const fingersMode = st.labels === "fingers" && a;
+        const inSet = a && a.pcs.includes(p) && (!pat || v || pat.has(s, f));
         if (!a) {
           cls = (flats ? FLATS : SHARPS)[p].length === 1 ? "natural" : "accidental";
-        } else if (a.pcs.includes(p)) {
+        } else if (inSet) {
           const i = pc(p - a.root);
           cls = "role-" + intervalRole(i);
           if (st.labels === "intervals") label = a.names[i];
@@ -451,6 +518,9 @@ function renderTuner() {
             label = f === 0 ? "0" : String(fg.fingers[s]);
             cls += " finger" + (f === 0 ? " open-string" : "");
             if (fg.barres.some(b => f === b.fret && s >= b.from && s <= b.to)) cls += " barre-note";
+          } else if (fingersMode && pat && !v) {
+            label = String(pat.finger(f, s));
+            cls += " finger" + (f === 0 ? " open-string" : "");
           } else if (fingersMode && st.mode === "scale" && !v) {
             const fg = scaleFinger(f);
             if (fg !== null) { label = String(fg); cls += " finger pick" + (f === 0 ? " open-string" : ""); }
@@ -686,11 +756,15 @@ function renderTuner() {
 
   function positionsHTML() {
     const cur = scalePos();
-    return `<div class="fb-pos"><span class="tool-label">Hand position</span>
+    return `<div class="fb-pos"><span class="tool-label">${st.scaleView === "all" ? "Hand position" : "Start position"}</span>
       <button class="chip" data-pos="prev" aria-label="Previous position">◀</button>
       ${Array.from({ length: 13 }, (_, i) => `<button class="chip ${i === cur ? "on" : ""}" data-pos="${i}">${i === 0 ? "Open" : i}</button>`).join("")}
       <button class="chip" data-pos="next" aria-label="Next position">▶</button></div>
-      <p class="hint">One finger per fret: finger 1 on fret ${cur === 0 ? "1" : cur}, finger 2 on the next fret, and so on. Only the notes your hand reaches here are numbered.</p>`;
+      <p class="hint">${st.scaleView === "all"
+        ? `One finger per fret: finger 1 on fret ${cur === 0 ? "1" : cur}, finger 2 on the next fret, and so on. Only the notes your hand reaches here are numbered.`
+        : st.scaleView === "octave"
+          ? `One octave from the first root on the 6th string at or after fret ${cur}.`
+          : `The pattern starts on the first scale note on the 6th string at or after fret ${cur}. Move it to learn every position of the scale.`}</p>`;
   }
 
   // Diatonic chords: stack every other note of a 7-note scale (1-3-5, 2-4-6, …).
