@@ -1968,9 +1968,17 @@ function renderTuner() {
     GuitarAudio.playMidi(m);
     const sugg = st.mode === "chord" && voicings[st.voicing];
     const shape = st.custom ? [...st.custom] : sugg ? [...sugg.frets] : [-1, -1, -1, -1, -1, -1];
-    shape[s] = shape[s] === f ? -1 : f;
-    st.custom = shape.every(x => x === -1) ? null : shape;
-    st.activeString = s;
+    if (st.activeString === s) {
+      // Choosing among the highlighted options: the tapped note replaces the
+      // old one and the options close (chosen note solid, the rest faded).
+      shape[s] = f;
+      st.activeString = null;
+    } else {
+      // First tap on this string: select the note and show the other options.
+      shape[s] = f;
+      st.activeString = s;
+    }
+    st.custom = shape;
     st.focus = null;
     drawFretboard(); drawShapeInfo(); drawFocus();
     if (st.mode === "chord") drawVoicings();
@@ -1981,7 +1989,7 @@ function renderTuner() {
     const a = activeSet();
     if (!a) { box.innerHTML = ""; return; }
     if (!st.custom) {
-      box.innerHTML = `<p class="hint fb-edit-hint">✎ Tap a ${st.mode} note to build your own shape — the other ${st.mode} notes on that string light up so you can switch. Tap a selected note again to mute that string.</p>`;
+      box.innerHTML = `<p class="hint fb-edit-hint">✎ Tap a ${st.mode} note to build your own shape — the other ${st.mode} notes on that string light up; tap one to swap it in.</p>`;
       return;
     }
     const frets = st.custom;
@@ -2014,10 +2022,18 @@ function renderTuner() {
           · ${plan.count} finger${plan.count === 1 ? "" : "s"}${plan.barres.length ? ` (${plan.barres.length === 1 ? "one presses" : plan.barres.length + " press"} several notes)` : ""}</span>
         ${warns.length ? `<span class="warn">⚠ ${warns.join(" · ")}</span>` : `<span class="ok">✓ Playable with ${plan.count} finger${plan.count === 1 ? "" : "s"}</span>`}
         <span class="fb-shape-btns">
+          ${st.activeString !== null ? `<button class="btn small" id="muteString">✕ Mute ${["6th", "5th", "4th", "3rd", "2nd", "1st"][st.activeString]} string</button>` : ""}
           <button class="btn small" id="playShape">▶ Play</button>
           <button class="btn small" id="clearShape">${st.mode === "chord" ? "↺ Back to suggested shape" : "Clear shape"}</button>
         </span>
       </div>`;
+    if ($("#muteString")) $("#muteString").onclick = () => {
+      const shape = [...st.custom];
+      shape[st.activeString] = -1;
+      st.custom = shape.every(x => x === -1) ? null : shape;
+      st.activeString = null;
+      drawFretboard(); drawShapeInfo(); if (st.mode === "chord") drawVoicings();
+    };
     $("#playShape").onclick = () => GuitarAudio.strumMidis(frets.map((f, s) => (f < 0 ? null : st.tuning[s] + f)));
     $("#clearShape").onclick = () => {
       st.custom = null; st.activeString = null;
