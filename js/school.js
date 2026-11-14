@@ -12,33 +12,52 @@
 const KEY_FILES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]; // file names per pitch class
 
 /* ---------- Backing tracks (key = detected key of the generated original) ---------- */
-// root/mode/chords were MEASURED from the generated audio (key detection +
-// bass-line analysis), not taken from the prompt — the AI doesn't always obey it.
-// chords: [name in the original key, number of bars]
+// Everything here was MEASURED from the generated audio by tools/make_tracks.py
+// (key, tempo to 0.01 BPM, bar-aligned loop, chords recognised bar by bar) —
+// the AI does not always follow its prompt, so we never trust the prompt.
+// prog = chords of one cycle of the progression (one per bar, in the original key).
 const TRACKS = {
   "minor-groove": {
-    title: "Minor rock groove", style: "Relaxed rock · 96 BPM",
-    root: 2, mode: "minor", bpm: 96, loopSeconds: 30.093,
-    chords: [["Dm", 2], ["F", 1], ["G", 1]],
-    desc: "Two bars of the minor i chord, then the ♭III and IV chords."
+    title: "Minor rock groove", style: "Relaxed rock · drums, bass & rhythm guitar",
+    root: 2, mode: "minor", bpm: 96.02, loopSeconds: 29.9938, loopBars: 12,
+    prog: ["Dm", "Dm", "F", "Gm"],
+    scales: ["min-pent", "blues", "minor", "dorian"]
   },
   "blues-shuffle": {
-    title: "Blues shuffle", style: "12-bar blues · boogie bass · 96 BPM",
-    root: 4, mode: "major", bpm: 96, loopSeconds: 30.093,
-    chords: [["E7", 4], ["A7", 2], ["E7", 2], ["B7", 1], ["A7", 1], ["E7", 1], ["B7", 1]],
-    desc: "The classic 12-bar form with the I7, IV7 and V7 chords."
+    title: "Blues shuffle", style: "12-bar blues with a boogie bass",
+    root: 4, mode: "major", bpm: 95.97, loopSeconds: 30.0094, loopBars: 12,
+    prog: ["E7", "E7", "E7", "A7", "A7", "E7", "E7", "B7", "A7", "E7", "B7", "E7"],
+    scales: ["blues", "min-pent", "maj-pent", "mixolydian"]
   },
   "pop-major": {
-    title: "Pop in a major key", style: "Bright pop-rock · 96 BPM",
-    root: 7, mode: "major", bpm: 96, loopSeconds: 30.093,
-    chords: [["G", 1], ["Am", 1], ["Em", 1], ["C", 1]],
-    desc: "I – ii – vi – IV, one chord per bar."
+    title: "Pop", style: "Bright pop-rock with strummed acoustic",
+    root: 7, mode: "major", bpm: 96.02, loopSeconds: 29.9938, loopBars: 12,
+    prog: ["G", "Am", "Em", "C"],
+    scales: ["maj-pent", "major"]
   },
   "folk-major": {
-    title: "Folk groove", style: "Acoustic folk-country · 96 BPM",
-    root: 0, mode: "major", bpm: 96, loopSeconds: 30.093,
-    chords: [["C", 3], ["G", 1]],
-    desc: "Mostly the I chord with a short turnaround — lots of space to play."
+    title: "Folk", style: "Acoustic folk-country",
+    root: 0, mode: "major", bpm: 96.01, loopSeconds: 19.9979, loopBars: 8,
+    prog: ["C", "C", "C", "C", "C", "Am", "G", "G"],
+    scales: ["maj-pent", "major", "mixolydian"]
+  },
+  "funk-vamp": {
+    title: "Funk vamp", style: "Tight sixteenth-note funk on one chord",
+    root: 4, mode: "minor", bpm: 100.02, loopSeconds: 28.7942, loopBars: 12,
+    prog: ["Em7", "Em7", "Em7", "Em7"],
+    scales: ["min-pent", "dorian", "blues"]
+  },
+  "reggae": {
+    title: "Reggae", style: "Laid-back one-drop reggae",
+    root: 2, mode: "major", bpm: 80.0, loopSeconds: 24.0, loopBars: 8,
+    prog: ["D", "A", "Bm7", "A", "D", "A", "D", "D"],
+    scales: ["maj-pent", "major"]
+  },
+  "latin-pop": {
+    title: "Latin pop", style: "Nylon-string guitar and cajón",
+    root: 2, mode: "major", bpm: 99.98, loopSeconds: 28.8058, loopBars: 12,
+    prog: ["D", "A", "D", "G"],
+    scales: ["maj-pent", "major", "mixolydian"]
   }
 };
 
@@ -259,7 +278,7 @@ const LESSONS = {
     minutes: 20,
     goals: ["Choose a scale for any track", "Improvise across the whole neck"],
     theory: `
-      <p>Congratulations — you know four scales! Now put them together. Pick any backing track and key below, choose a scale that fits, and improvise.</p>
+      <p>Congratulations — you know four scales! Now put them together. Pick any backing track and key below, choose a scale that fits, and improvise. For more grooves, a tempo control and live chord display, open the <a href="#/jam">Jam room</a>.</p>
       <table class="mini-table">
         <tr><th>Track</th><th>Scales that fit</th></tr>
         <tr><td>Minor groove</td><td>Minor pentatonic, blues scale</td></tr>
@@ -600,14 +619,16 @@ function renderLesson(id) {
     const shift = pc(st.key - t.root);
     // Spell chords like the key signature: C minor / F major use flats (E♭, B♭), E major sharps.
     const flats = keyUsesFlats(transposeKey(ROOT_NAMES[t.root] + (t.mode === "minor" ? "m" : ""), shift));
-    const chords = t.chords.map(([c, n]) => transposeChord(c, shift, flats).replace("#", "♯").replace(/([A-G])b/, "$1♭") + (n > 1 ? ` <small>×${n}</small>` : ""));
+    const runs = [];
+    t.prog.forEach(c => { const last = runs[runs.length - 1]; if (last && last[0] === c) last[1]++; else runs.push([c, 1]); });
+    const chords = runs.map(([c, n]) => transposeChord(c, shift, flats).replace("#", "♯").replace(/([A-G])b/, "$1♭") + (n > 1 ? ` <small>×${n}</small>` : ""));
     const keyName = pretty(ROOT_NAMES[st.key]) + (t.mode === "minor" ? "m" : "");
     const trackOptions = P.free ? Object.entries(TRACKS).map(([id, tr]) => `<button class="chip ${id === st.track ? "on" : ""}" data-track="${id}">${tr.title}</button>`).join("") : "";
     const scaleOptions = P.free ? Object.entries(SCHOOL_SCALES).map(([id, sc]) => `<button class="chip ${id === st.scale ? "on" : ""}" data-scale="${id}">${sc.name}</button>`).join("") : "";
     box.innerHTML = `
       <div class="player-head">
         <button class="play-btn" id="playBtn" aria-label="Play backing track">${Backing.playing ? "❚❚" : "▶"}</button>
-        <div><strong>🎧 ${t.title}</strong> <span class="song-meta">· ${t.style} · loops every ${Math.round(t.loopSeconds)} s</span>
+        <div><strong>🎧 ${t.title}</strong> <span class="song-meta">· ${t.style} · ${Math.round(t.bpm)} BPM · loops every ${Math.round(t.loopSeconds)} s</span>
           <div class="chord-pills">${chords.map(c => `<span class="pill">${c}</span>`).join("")}</div></div>
         <label class="tool vol"><span class="tool-label">Vol</span><input type="range" id="vol" min="0" max="1" step="0.05" value="0.8"></label>
       </div>

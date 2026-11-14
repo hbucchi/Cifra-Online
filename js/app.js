@@ -150,6 +150,7 @@ function route() {
   const parts = hash.split("/").filter(Boolean);
   if (parts.length === 0 || parts[0] === "school") renderSchool();
   else if (parts[0] === "lesson" && parts[1]) renderLesson(parts[1]);
+  else if (parts[0] === "jam") renderJam();
   else if (parts[0] === "chords") renderChords();
   else if (parts[0] === "tuner") renderTuner();
   else if (parts[0] === "learn") renderLearn();
