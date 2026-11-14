@@ -231,10 +231,10 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-options { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 10px 0; }
 
 .fb-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); padding: 10px 6px 4px; }
-.fb { width: max-content; user-select: none; -webkit-user-select: none; }
+.fb { width: 100%; min-width: max-content; user-select: none; -webkit-user-select: none; }
 .fb.lefty .fb-row { direction: rtl; }
 .fb.lefty .fb-tune, .fb.lefty .fb-cell { direction: ltr; }
-.fb-row { display: grid; grid-template-columns: var(--tune-w) auto; align-items: stretch; }
+.fb-row { display: grid; grid-template-columns: var(--tune-w) 1fr; align-items: stretch; }
 .fb-tune { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding-right: 8px; }
 .fb-btn { font: inherit; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; line-height: 1; }
 .fb-btn:hover { border-color: var(--accent); }
@@ -242,7 +242,7 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-note.changed { border-color: var(--chord); color: var(--chord); }
 .fb-note em { font-style: normal; font-size: .75em; margin-left: 3px; color: var(--chord); }
 
-.fb-strings { display: grid; grid-template-columns: var(--open-w) repeat(15, var(--fw)); position: relative; background: linear-gradient(var(--wood), var(--wood-2)); touch-action: pan-y; cursor: ew-resize; }
+.fb-strings { display: grid; grid-template-columns: var(--open-w) repeat(15, minmax(var(--fw), 1fr)); position: relative; background: linear-gradient(var(--wood), var(--wood-2)); touch-action: pan-y; cursor: ew-resize; }
 .fb-row:first-child .fb-strings { border-radius: 8px 8px 0 0; }
 .fb-row:nth-last-child(2) .fb-strings { border-radius: 0 0 8px 8px; }
 .fb-strings::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: var(--thick); transform: translateY(-50%); background: var(--string); box-shadow: 0 1px 1px rgba(0,0,0,.4); pointer-events: none; }
@@ -281,3 +281,43 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-arrow { font-size: 2rem; color: var(--muted); }
 .fb-tuning-bar .tool, .fb-type-row .tool { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 .fb-tuning-bar select, .fb-type-row select { width: auto; max-width: min(100%, calc(100vw - 48px)); }
+
+/* Mode switch (segmented control) */
+.fb-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 20px; }
+.fb-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; background: var(--surface); gap: 2px; margin: 0; }
+.fb-seg .tab { border: none; border-radius: 999px; padding: 8px 18px; color: var(--muted); font-weight: 600; }
+.fb-seg .tab.on { background: var(--accent); color: #fff; }
+.fb-types { margin: 6px 0; }
+.fb-types .chip small, .fb-pickers .chip small { color: inherit; opacity: .7; font-weight: 700; margin-right: 2px; }
+.fb-sub { margin: 10px 0 4px; }
+.note-link { font: inherit; font-weight: 700; background: none; border: none; border-bottom: 2px dotted var(--accent); color: var(--text); cursor: pointer; padding: 0 2px; }
+.note-link.on { background: #facc15; color: #111; border-radius: 4px; }
+
+/* Tapped note: every place it appears glows, the exact pitch is filled */
+.fb-dot.focus { box-shadow: 0 0 0 3px #facc15, 0 0 14px 2px rgba(250, 204, 21, .9); opacity: 1 !important; z-index: 3; }
+.fb-dot.focus-exact { background: #facc15 !important; color: #111 !important; transform: translate(-50%, -50%) scale(1.18); }
+.fb-dot.inline { position: static; transform: none; display: inline-grid; vertical-align: middle; margin-right: 6px; }
+.fb-focus { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin: 10px 2px 0; font-size: .92rem; }
+
+/* Rotate hint: only on phones held upright */
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 640px) { .rotate-hint { display: block; } }
+
+/* Phone held sideways: fit all 15 frets on screen */
+@media (orientation: landscape) and (max-height: 540px) {
+  :root { --fw: 26px; --open-w: 30px; --tune-w: 58px; }
+  .topbar { position: static; }
+  .container { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+  .fb-wrap { padding: 4px 2px 2px; }
+  .fb-btn { display: none; }
+  .fb-tune { padding-right: 4px; }
+  .fb-note { min-width: 0; padding: 1px 4px; font-size: .8rem; }
+  .fb-cell { height: 31px; }
+  .fb-cell.mark { height: 24px; }
+  .fb-dot { min-width: 22px; height: 22px; font-size: .66rem; padding: 0 2px; }
+  .fb-dot.ghost { min-width: 18px; height: 17px; font-size: .6rem; }
+}
+
+/* Full-screen neck */
+.fb-stage:fullscreen, .fb-stage:-webkit-full-screen { background: var(--bg); padding: 12px max(12px, env(safe-area-inset-left)); overflow: auto; display: flex; flex-direction: column; justify-content: center; }
+.fb-stage:fullscreen .fb-wrap { flex: none; }

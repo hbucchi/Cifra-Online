@@ -71,6 +71,26 @@ function chooseFlats(rootPc, pcs) {
   return ROOT_NAMES[rootPc].includes("b") || rootPc === 5;
 }
 
+/*
+ * Correct spelling from intervals: a 3rd always uses the letter two steps above
+ * the root, a 5th four steps, a 7th six steps… So C minor's 3rd is E♭ (letter E),
+ * never D♯. Returns a Map pitch-class → name for the notes of a chord/scale.
+ */
+function spellSet(rootPc, iv, isChord) {
+  const LETTERS = "CDEFGAB";
+  const letterSteps = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 4, 8: isChord ? 4 : 5, 9: 5, 10: 6, 11: 6 };
+  const rootName = ROOT_NAMES[rootPc];
+  const r = LETTERS.indexOf(rootName[0]);
+  const map = new Map();
+  for (const i of iv) {
+    const p = pc(rootPc + i);
+    const want = LETTERS[(r + letterSteps[pc(i)]) % 7];
+    const name = [SHARPS[p], FLATS[p]].find(n => n[0] === want) || (rootName.includes("b") ? FLATS[p] : SHARPS[p]);
+    map.set(p, pretty(name));
+  }
+  return map;
+}
+
 const noteName = (p, flats) => pretty((flats ? FLATS : SHARPS)[pc(p)]);
 const midiName = (m, flats) => `${noteName(m, flats)}<sub>${Math.floor(m / 12) - 1}</sub>`;
 const midiText = (m, flats) => `${noteName(m, flats)}${Math.floor(m / 12) - 1}`;
@@ -177,7 +197,8 @@ function renderTuner() {
     scaleType: saved.scaleType ?? "min-pent",
     labels: saved.labels || "names",
     showAll: saved.showAll ?? false,
-    voicing: 0
+    voicing: 0,
+    focus: null // { pc, midi } — the note the user tapped
   };
   const FRETS = 15;
   const save = () => store.set("fb", {
@@ -199,10 +220,13 @@ function renderTuner() {
       <div id="tuningInfo" class="fb-tuning-info"></div>
     </section>
 
-    <div class="view-tabs fb-modes" role="tablist">
-      <button class="tab" data-mode="notes">All notes</button>
-      <button class="tab" data-mode="chord">Chords</button>
-      <button class="tab" data-mode="scale">Scales</button>
+    <div class="fb-mode-row">
+      <span class="tool-label">Show on the neck</span>
+      <div class="fb-seg fb-modes" role="tablist">
+        <button class="tab" data-mode="notes">All notes</button>
+        <button class="tab" data-mode="chord">Chord</button>
+        <button class="tab" data-mode="scale">Scale</button>
+      </div>
     </div>
     <section id="pickers" class="fb-pickers"></section>
 
@@ -213,11 +237,15 @@ function renderTuner() {
       </div>
       <label class="toggle"><input type="checkbox" id="showAll"> Show other notes</label>
       <label class="toggle"><input type="checkbox" id="fbLefty"> Left-handed</label>
-      <span class="hint">Tip: tap any fret to hear it.</span>
+      <button class="btn small" id="fullBtn" hidden>⛶ Full screen</button>
     </div>
+    <p class="hint rotate-hint">📱↻ Turn your phone sideways to see the whole neck.</p>
 
-    <div class="fb-wrap"><div class="fb" id="fb"></div></div>
-    <div id="legend" class="fb-legend"></div>
+    <div class="fb-stage" id="stage">
+      <div class="fb-wrap"><div class="fb" id="fb"></div></div>
+      <div id="focusInfo" class="fb-focus"></div>
+      <div id="legend" class="fb-legend"></div>
+    </div>
 
     <section id="voicings"></section>
   `;
@@ -233,15 +261,23 @@ function renderTuner() {
     if (st.mode === "chord") {
       const t = chordType();
       const pcs = t.iv.map(i => pc(st.chordRoot + i));
-      return { root: st.chordRoot, iv: t.iv, pcs, flats: chooseFlats(st.chordRoot, pcs), names: CHORD_INTERVALS };
+      return withSpelling({ root: st.chordRoot, iv: t.iv, pcs, flats: chooseFlats(st.chordRoot, pcs), names: CHORD_INTERVALS }, true);
     }
     if (st.mode === "scale") {
       const t = scaleType();
       const pcs = t.iv.map(i => pc(st.scaleRoot + i));
-      return { root: st.scaleRoot, iv: t.iv, pcs, flats: chooseFlats(st.scaleRoot, pcs), names: SCALE_INTERVALS };
+      return withSpelling({ root: st.scaleRoot, iv: t.iv, pcs, flats: chooseFlats(st.scaleRoot, pcs), names: SCALE_INTERVALS }, false);
     }
     return null;
   }
+
+  function withSpelling(a, isChord) {
+    a.spell = spellSet(a.root, a.iv, isChord);
+    a.nm = p => a.spell.get(pc(p)) || noteName(p, a.flats);
+    return a;
+  }
+  // Name a note: use the chord/scale spelling when the note belongs to it.
+  const nameIn = (a, p) => (a ? a.nm(p) : noteName(p, false));
 
   let voicings = [];
 
@@ -281,40 +317,51 @@ function renderTuner() {
     const types = isChord ? CHORD_TYPES : SCALE_TYPES;
     const typeId = isChord ? st.chordType : st.scaleType;
     const a = activeSet();
-    const names = a.pcs.map(x => noteName(x, a.flats));
+    const names = a.pcs.map(x => `<button class="note-link ${st.focus && st.focus.pc === x ? "on" : ""}" data-focus-pc="${x}">${a.nm(x)}</button>`);
     const ivNames = a.iv.map(i => a.names[i]);
     let formula = "";
     if (isChord) {
-      formula = `<strong>${noteName(root, a.flats)}${chordType().id}</strong> = ${names.join(" · ")} <span class="hint">(${ivNames.join(" · ")})</span>`;
+      formula = `<strong>${a.nm(root)}${chordType().id}</strong> = ${names.join(" · ")} <span class="hint">(${ivNames.join(" · ")})</span>`;
     } else {
       const sorted = [...a.iv].sort((x, y) => x - y);
       const steps = sorted.map((v, k) => (k + 1 < sorted.length ? sorted[k + 1] : 12) - v)
         .map(d => ({ 1: "H", 2: "W", 3: "W+H", 4: "2W" }[d] || d));
-      formula = `<strong>${noteName(root, a.flats)} ${scaleType().name}</strong> = ${names.join(" · ")}
+      formula = `<strong>${a.nm(root)} ${scaleType().name}</strong> = ${names.join(" · ")}
         <span class="hint">(steps: ${steps.join(" ")} — W = whole tone = 2 frets, H = half tone = 1 fret)</span>`;
     }
     p.innerHTML = `
       <div class="chips fb-roots" role="group" aria-label="Root note">
         ${ROOT_NAMES.map((n, i) => `<button class="chip ${i === root ? "on" : ""}" data-root="${i}">${pretty(n)}</button>`).join("")}
       </div>
-      <div class="fb-type-row">
-        <label class="tool"><span class="tool-label">${isChord ? "Chord" : "Scale"}</span>
-          <select id="typeSel">${types.map(t => `<option value="${t.id}" ${t.id === typeId ? "selected" : ""}>${t.name}</option>`).join("")}</select>
-        </label>
-        ${isChord ? "" : `<button class="btn" id="playScale">▶ Play scale</button>`}
+      <div class="chips fb-types" role="group" aria-label="${isChord ? "Chord type" : "Scale type"}">
+        ${types.map(t => `<button class="chip ${t.id === typeId ? "on" : ""}" data-type="${t.id}">${isChord ? (a.nm(root) + t.id) : t.name}</button>`).join("")}
       </div>
-      <p class="fb-formula">${formula}</p>
+      <p class="fb-formula">${formula}
+        ${isChord ? `<button class="btn small" id="playChord">▶ Play</button>` : `<button class="btn small" id="playScale">▶ Play scale</button>`}</p>
+      ${isChord ? "" : scaleChordsHTML(a)}
     `;
     p.querySelectorAll("[data-root]").forEach(b => b.onclick = () => {
       if (isChord) st.chordRoot = Number(b.dataset.root); else st.scaleRoot = Number(b.dataset.root);
       st.voicing = 0; save(); drawAll();
       if (isChord && voicings[0]) playVoicing(voicings[0]);
     });
-    $("#typeSel").onchange = e => {
-      if (isChord) st.chordType = e.target.value; else st.scaleType = e.target.value;
+    p.querySelectorAll("[data-type]").forEach(b => b.onclick = () => {
+      if (isChord) st.chordType = b.dataset.type; else st.scaleType = b.dataset.type;
       st.voicing = 0; save(); drawAll();
       if (isChord && voicings[0]) playVoicing(voicings[0]);
-    };
+    });
+    p.querySelectorAll("[data-focus-pc]").forEach(b => b.onclick = () => {
+      const x = Number(b.dataset.focusPc);
+      st.focus = st.focus && st.focus.pc === x && st.focus.midi === null ? null : { pc: x, midi: null };
+      drawPickers(); drawFretboard(); drawFocus();
+    });
+    // Chords of the scale → jump to chord mode.
+    p.querySelectorAll("[data-goto-chord]").forEach(b => b.onclick = () => {
+      const [r, t] = b.dataset.gotoChord.split("|");
+      st.mode = "chord"; st.chordRoot = Number(r); st.chordType = t; st.voicing = 0; save(); drawAll();
+      if (voicings[0]) playVoicing(voicings[0]);
+    });
+    if ($("#playChord")) $("#playChord").onclick = () => { if (voicings[st.voicing]) playVoicing(voicings[st.voicing]); };
     if ($("#playScale")) $("#playScale").onclick = () => {
       // Start from the lowest root on the 6th string, go up one octave.
       let start = st.tuning[0];
@@ -340,7 +387,7 @@ function renderTuner() {
         const m = open + f, p = pc(m);
         let dot = "";
         let cls = "";
-        let label = noteName(p, flats);
+        let label = nameIn(a, p);
         if (!a) {
           cls = (flats ? FLATS : SHARPS)[p].length === 1 ? "natural" : "accidental";
         } else if (a.pcs.includes(p)) {
@@ -352,6 +399,10 @@ function renderTuner() {
           cls = "ghost";
         } else {
           label = null;
+        }
+        if (st.focus && st.focus.pc === p) {
+          if (label === null) { label = nameIn(a, p); cls = "ghost"; }
+          cls += st.focus.midi === m ? " focus focus-exact" : " focus";
         }
         if (label !== null) dot = `<span class="fb-dot ${cls}">${label}</span>`;
         if (f === 0 && v && v.frets[s] === -1) dot = `<span class="fb-mute">×</span>`;
@@ -403,12 +454,12 @@ function renderTuner() {
     const box = $("#voicings");
     if (st.mode !== "chord") { box.innerHTML = ""; return; }
     const a = activeSet();
-    const name = noteName(st.chordRoot, a.flats) + chordType().id;
+    const name = a.nm(st.chordRoot) + chordType().id;
     const isStandard = st.tuning.every((m, s) => m === STANDARD_TUNING[s]);
     const card = (v, i, small) => `
       <button class="diagram-card ${i === st.voicing && !small ? "on" : ""}" ${small ? "" : `data-v="${i}"`}
-        title="${v.inversion ? "Inversion: the lowest note is " + noteName(v.bassPc, a.flats) + ", not the root" : ""}">
-        <span class="diagram-name">${name}${v.inversion ? "/" + noteName(v.bassPc, a.flats) : ""}</span>
+        title="${v.inversion ? "Inversion: the lowest note is " + a.nm(v.bassPc) + ", not the root" : ""}">
+        <span class="diagram-name">${name}${v.inversion ? "/" + a.nm(v.bassPc) : ""}</span>
         ${fingeringSVG(autoFingering(v.frets), name, { lefty: prefs.lefty })}
         <small>${shapeLabel(v)}<br><code>${fretsText(v.frets)}</code></small>
       </button>`;
@@ -446,11 +497,66 @@ function renderTuner() {
     });
   }
 
+  // Tap a note: hear it and highlight every place it lives on the neck.
+  function tapNote(m) {
+    GuitarAudio.playMidi(m);
+    st.focus = st.focus && st.focus.midi === m ? null : { pc: pc(m), midi: m };
+    drawFretboard(); drawFocus();
+    if (st.mode !== "notes") drawPickers();
+  }
+
+  function drawFocus() {
+    const box = $("#focusInfo");
+    if (!st.focus) { box.innerHTML = `<span class="hint">Tap any note to hear it and see everywhere it appears on the neck.</span>`; return; }
+    const a = activeSet();
+    const flats = a ? a.flats : false;
+    const name = nameIn(a, st.focus.pc);
+    const ordinal = s => ["6th", "5th", "4th", "3rd", "2nd", "1st"][s];
+    let all = 0;
+    const same = [];
+    st.tuning.forEach((open, s) => {
+      for (let f = 0; f <= FRETS; f++) {
+        if (pc(open + f) === st.focus.pc) all++;
+        if (st.focus.midi !== null && open + f === st.focus.midi) same.push(`${ordinal(s)} string ${f === 0 ? "open" : "fret " + f}`);
+      }
+    });
+    let role = "";
+    if (a && a.pcs.includes(st.focus.pc)) {
+      const i = pc(st.focus.pc - a.root);
+      role = ` It is the <strong>${i === 0 ? "root (R)" : a.names[i]}</strong> of ${st.mode === "chord" ? "this chord" : "this scale"}.`;
+    } else if (a) role = ` It is <em>not</em> in this ${st.mode}.`;
+    box.innerHTML = `
+      <span><span class="fb-dot focus focus-exact inline">${name}</span>
+      ${st.focus.midi !== null
+        ? `<strong>${name}${Math.floor(st.focus.midi / 12) - 1}</strong> (${GuitarAudio.midiFreq(st.focus.midi).toFixed(1)} Hz) — the exact same pitch is at: ${same.join(", ")}.`
+        : `All <strong>${name}</strong> notes.`}
+      ${all} ${name} spots on this neck (different octaves are glowing).${role}</span>
+      <button class="btn small" id="clearFocus">Clear</button>`;
+    $("#clearFocus").onclick = () => { st.focus = null; drawFretboard(); drawFocus(); if (st.mode !== "notes") drawPickers(); };
+  }
+
+  // Diatonic chords: stack every other note of a 7-note scale (1-3-5, 2-4-6, …).
+  function scaleChordsHTML(a) {
+    const sorted = [...a.iv].sort((x, y) => x - y);
+    if (sorted.length !== 7) return "";
+    const roman = ["I", "II", "III", "IV", "V", "VI", "VII"];
+    const chips = sorted.map((iv, k) => {
+      const third = (sorted[(k + 2) % 7] - iv + 12) % 12;
+      const fifth = (sorted[(k + 4) % 7] - iv + 12) % 12;
+      const type = CHORD_TYPES.find(t => t.iv.length === 3 && t.iv[1] === third && t.iv[2] === fifth);
+      if (!type) return "";
+      const r = pc(a.root + iv);
+      const numeral = type.id === "m" || type.id === "dim" ? roman[k].toLowerCase() : roman[k];
+      return `<button class="chip" data-goto-chord="${r}|${type.id}"><small>${numeral}${type.id === "dim" ? "°" : ""}</small> ${a.nm(r)}${type.id}</button>`;
+    }).join("");
+    return `<p class="tool-label fb-sub">Chords in this scale <span class="hint">(tap to open)</span></p><div class="chips">${chips}</div>`;
+  }
+
   function drawAll() {
     if (st.mode === "chord") voicings = findVoicings(st.tuning, st.chordRoot, chordType().iv);
     else voicings = [];
     if (st.voicing >= voicings.length) st.voicing = 0;
-    drawTuningInfo(); drawPickers(); drawFretboard(); drawLegend(); drawVoicings();
+    drawTuningInfo(); drawPickers(); drawFretboard(); drawFocus(); drawLegend(); drawVoicings();
     document.querySelectorAll("[data-labels]").forEach(b => b.classList.toggle("on", b.dataset.labels === st.labels));
     $("#showAll").checked = st.showAll;
     $("#fbLefty").checked = prefs.lefty;
@@ -483,7 +589,7 @@ function renderTuner() {
     const t = e.target.closest("[data-tune]");
     if (t) return retune(Number(t.dataset.s), Number(t.dataset.tune));
     const o = e.target.closest("[data-open]");
-    if (o) GuitarAudio.playMidi(st.tuning[Number(o.dataset.open)]);
+    if (o) tapNote(st.tuning[Number(o.dataset.open)]);
   });
 
   /*
@@ -526,11 +632,29 @@ function renderTuner() {
       if (steps) retune(d.s, -steps); else drawFretboard();
     } else if (e.type === "pointerup") {
       const cell = d.target.closest(".fb-cell");
-      if (cell) GuitarAudio.playMidi(st.tuning[d.s] + Number(cell.dataset.f));
+      if (cell) tapNote(st.tuning[d.s] + Number(cell.dataset.f));
     }
   };
   fb.addEventListener("pointerup", endDrag);
   fb.addEventListener("pointercancel", endDrag);
+
+  // Full screen (where supported) + try to lock landscape on phones.
+  const stage = $("#stage");
+  if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
+    $("#fullBtn").hidden = false;
+    $("#fullBtn").onclick = async () => {
+      try {
+        if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+        await (stage.requestFullscreen ? stage.requestFullscreen() : stage.webkitRequestFullscreen());
+        if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape").catch(() => {});
+      } catch { /* not allowed — ignore */ }
+    };
+  }
+  // When the phone turns sideways, bring the whole neck into view.
+  const landscape = window.matchMedia("(orientation: landscape) and (max-height: 540px)");
+  const onRotate = () => { if (landscape.matches) setTimeout(() => stage.scrollIntoView({ block: "start", behavior: "smooth" }), 250); };
+  landscape.addEventListener("change", onRotate);
+  cleanup = () => landscape.removeEventListener("change", onRotate);
 
   drawAll();
 }
