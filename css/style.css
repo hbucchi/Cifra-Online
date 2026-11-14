@@ -249,18 +249,20 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-row.dragging .fb-strings::before { background: #fde68a; }
 .fb-cell { position: relative; height: 38px; border-right: 2px solid var(--fretwire); }
 .fb-cell.open { background: var(--surface); border-right: 6px solid #f1ede4; }
-.fb-dot { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 28px; height: 26px; padding: 0 4px; border-radius: 13px; display: grid; place-items: center; font-size: .78rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
+.fb-dot { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 23px; height: 23px; border-radius: 50%; display: grid; place-items: center; font-size: .66rem; font-weight: 700; letter-spacing: -.02em; color: #fff; z-index: 1; pointer-events: none;
+  background-image: radial-gradient(circle at 35% 30%, rgba(255,255,255,.28), rgba(255,255,255,0) 60%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.35); transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease, background-color .18s ease; }
 .fb-row.dragging .fb-dot { transform: translate(calc(-50% + var(--dx, 0px)), -50%); opacity: .85; }
-.fb-dot.natural { background: #f8fafc; color: #1f2328; }
-.fb-dot.accidental { background: rgba(248, 250, 252, .35); color: #fff; font-weight: 500; }
-.fb-dot.ghost { background: rgba(255,255,255,.18); color: rgba(255,255,255,.75); font-weight: 500; min-width: 22px; height: 20px; font-size: .7rem; }
-.fb-dot.role-root { background: var(--c-root); }
-.fb-dot.role-third { background: var(--c-third); }
-.fb-dot.role-fifth { background: var(--c-fifth); }
-.fb-dot.role-seventh { background: var(--c-seventh); }
-.fb-dot.role-other { background: var(--c-other); }
-.fb-dot.faded { opacity: .35; }
-.fb-dot.pick { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #111; transform: translate(-50%, -50%) scale(1.12); z-index: 2; }
+.fb-dot.natural { background-color: #f8fafc; color: #1f2328; }
+.fb-dot.accidental { background-color: rgba(248, 250, 252, .3); color: #fff; font-weight: 500; }
+.fb-dot.ghost { background-color: rgba(255,255,255,.16); color: rgba(255,255,255,.75); font-weight: 500; width: 18px; height: 18px; font-size: .58rem; box-shadow: none; }
+.fb-dot.role-root { background-color: var(--c-root); }
+.fb-dot.role-third { background-color: var(--c-third); }
+.fb-dot.role-fifth { background-color: var(--c-fifth); }
+.fb-dot.role-seventh { background-color: var(--c-seventh); }
+.fb-dot.role-other { background-color: var(--c-other); }
+.fb-dot.faded { opacity: .3; transform: translate(-50%, -50%) scale(.82); }
+.fb-dot.pick { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(17,17,17,.85), 0 2px 6px rgba(0,0,0,.45); transform: translate(-50%, -50%) scale(1.08); z-index: 2; }
 .fb-mute { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.3rem; font-weight: 700; color: var(--muted); }
 .fb-row.markers .fb-strings { background: none; cursor: default; touch-action: auto; }
 .fb-row.markers .fb-strings::before { display: none; }
@@ -269,7 +271,7 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 
 .fb-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 10px 2px 18px; font-size: .88rem; color: var(--muted); align-items: center; }
 .fb-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.fb-legend .fb-dot { position: static; transform: none; min-width: 18px; height: 18px; display: inline-grid; font-size: .65rem; }
+.fb-legend .fb-dot { position: static; transform: none; width: 16px; height: 16px; display: inline-grid; font-size: .58rem; }
 .fb-legend .fb-dot.natural { border: 1px solid var(--border); }
 .fb-legend .fb-dot.accidental { background: #94a3b8; }
 .fb-legend .fb-dot.pick { transform: none; }
@@ -294,9 +296,9 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .note-link.on { background: #facc15; color: #111; border-radius: 4px; }
 
 /* Tapped note: every place it appears glows, the exact pitch is filled */
-.fb-dot.focus { box-shadow: 0 0 0 3px #facc15, 0 0 14px 2px rgba(250, 204, 21, .9); opacity: 1 !important; z-index: 3; }
-.fb-dot.focus-exact { background: #facc15 !important; color: #111 !important; transform: translate(-50%, -50%) scale(1.18); }
-.fb-dot.inline { position: static; transform: none; display: inline-grid; vertical-align: middle; margin-right: 6px; }
+.fb-dot.focus { box-shadow: 0 0 0 2px #facc15, 0 0 10px 1px rgba(250, 204, 21, .8); opacity: 1 !important; z-index: 3; }
+.fb-dot.focus-exact { background-color: #facc15 !important; color: #111 !important; transform: translate(-50%, -50%) scale(1.1); }
+.fb-dot.inline { position: static; transform: none; display: inline-grid; vertical-align: middle; margin-right: 6px; width: 22px; height: 22px; }
 .fb-focus { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin: 10px 2px 0; font-size: .92rem; }
 
 /* Rotate hint: only on phones held upright */
@@ -314,10 +316,19 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
   .fb-note { min-width: 0; padding: 1px 4px; font-size: .8rem; }
   .fb-cell { height: 31px; }
   .fb-cell.mark { height: 24px; }
-  .fb-dot { min-width: 22px; height: 22px; font-size: .66rem; padding: 0 2px; }
-  .fb-dot.ghost { min-width: 18px; height: 17px; font-size: .6rem; }
+  .fb-dot { width: 19px; height: 19px; font-size: .56rem; }
+  .fb-dot.ghost { width: 15px; height: 15px; font-size: .5rem; }
 }
 
 /* Full-screen neck */
 .fb-stage:fullscreen, .fb-stage:-webkit-full-screen { background: var(--bg); padding: 12px max(12px, env(safe-area-inset-left)); overflow: auto; display: flex; flex-direction: column; justify-content: center; }
 .fb-stage:fullscreen .fb-wrap { flex: none; }
+
+/* Finger numbers inside the dots */
+.fb-dot.finger { font-size: .74rem; font-weight: 800; }
+.fb-dot.finger.open-string { background-color: transparent; color: #fff; box-shadow: inset 0 0 0 2px #fff; background-image: none; }
+.fb-legend .fb-dot.finger.open-string { color: var(--text); box-shadow: inset 0 0 0 1.5px var(--text); }
+.fb-dot.barre-note { border-radius: 7px; }
+.fb-pos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.fb-pos .chip { min-width: 40px; padding: 4px 10px; }
+.finger-count { display: block; font-weight: 600; color: var(--text); }

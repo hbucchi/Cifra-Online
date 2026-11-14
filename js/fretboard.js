@@ -195,6 +195,7 @@ function renderTuner() {
     chordType: saved.chordType ?? "",
     scaleRoot: saved.scaleRoot ?? 9,
     scaleType: saved.scaleType ?? "min-pent",
+    scalePos: saved.scalePos ?? null, // hand position for scale fingering (fret of finger 1)
     labels: saved.labels || "names",
     showAll: saved.showAll ?? false,
     voicing: 0,
@@ -203,7 +204,7 @@ function renderTuner() {
   const FRETS = 15;
   const save = () => store.set("fb", {
     tuning: st.tuning, mode: st.mode, chordRoot: st.chordRoot, chordType: st.chordType,
-    scaleRoot: st.scaleRoot, scaleType: st.scaleType, labels: st.labels, showAll: st.showAll
+    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, labels: st.labels, showAll: st.showAll
   });
 
   app.innerHTML = `
@@ -234,6 +235,7 @@ function renderTuner() {
       <div class="chips" role="group" aria-label="Labels">
         <button class="chip" data-labels="names">Note names</button>
         <button class="chip" data-labels="intervals">Intervals</button>
+        <button class="chip" data-labels="fingers" id="fingersChip">Fingers ✋</button>
       </div>
       <label class="toggle"><input type="checkbox" id="showAll"> Show other notes</label>
       <label class="toggle"><input type="checkbox" id="fbLefty"> Left-handed</label>
@@ -278,6 +280,19 @@ function renderTuner() {
   }
   // Name a note: use the chord/scale spelling when the note belongs to it.
   const nameIn = (a, p) => (a ? a.nm(p) : noteName(p, false));
+
+  // Default hand position for a scale: where the root sits on the 6th string.
+  const scalePos = () => (st.scalePos !== null ? st.scalePos : pc(st.scaleRoot - st.tuning[0]));
+  // One finger per fret: a 4-fret window starting at the position.
+  // Position 0 = open position (open strings + frets 1–4).
+  function scaleFinger(f) {
+    const pos = scalePos();
+    if (pos === 0) return f <= 4 ? f : null;
+    return f >= pos && f <= pos + 3 ? f - pos + 1 : null;
+  }
+  const fingerText = v => v.fingers === 0 ? "No fingers — all open"
+    : v.barre ? `Barre + ${v.fingers - 1} finger${v.fingers - 1 === 1 ? "" : "s"} (${v.fingers} total)`
+    : `${v.fingers} finger${v.fingers === 1 ? "" : "s"}`;
 
   let voicings = [];
 
@@ -338,10 +353,17 @@ function renderTuner() {
       </div>
       <p class="fb-formula">${formula}
         ${isChord ? `<button class="btn small" id="playChord">▶ Play</button>` : `<button class="btn small" id="playScale">▶ Play scale</button>`}</p>
+      ${!isChord && st.labels === "fingers" ? positionsHTML() : ""}
       ${isChord ? "" : scaleChordsHTML(a)}
     `;
+    p.querySelectorAll("[data-pos]").forEach(b => b.onclick = () => {
+      const v = b.dataset.pos;
+      const cur = scalePos();
+      st.scalePos = v === "prev" ? Math.max(0, cur - 1) : v === "next" ? Math.min(12, cur + 1) : Number(v);
+      save(); drawPickers(); drawFretboard();
+    });
     p.querySelectorAll("[data-root]").forEach(b => b.onclick = () => {
-      if (isChord) st.chordRoot = Number(b.dataset.root); else st.scaleRoot = Number(b.dataset.root);
+      if (isChord) st.chordRoot = Number(b.dataset.root); else { st.scaleRoot = Number(b.dataset.root); st.scalePos = null; }
       st.voicing = 0; save(); drawAll();
       if (isChord && voicings[0]) playVoicing(voicings[0]);
     });
@@ -376,6 +398,7 @@ function renderTuner() {
     const a = activeSet();
     const flats = a ? a.flats : false;
     const v = st.mode === "chord" ? voicings[st.voicing] : null;
+    const fing = v ? autoFingering(v.frets) : null;
     const fb = $("#fb");
     fb.classList.toggle("lefty", prefs.lefty);
     const rows = [];
@@ -388,6 +411,7 @@ function renderTuner() {
         let dot = "";
         let cls = "";
         let label = nameIn(a, p);
+        const fingersMode = st.labels === "fingers" && a;
         if (!a) {
           cls = (flats ? FLATS : SHARPS)[p].length === 1 ? "natural" : "accidental";
         } else if (a.pcs.includes(p)) {
@@ -395,6 +419,17 @@ function renderTuner() {
           cls = "role-" + intervalRole(i);
           if (st.labels === "intervals") label = a.names[i];
           if (v) cls += v.frets[s] === f ? " pick" : " faded";
+          if (fingersMode && st.mode === "chord" && v && v.frets[s] === f) {
+            // Finger from the same logic as the chord diagrams (1 index … 4 pinky, 0 open).
+            const fg = fing;
+            label = f === 0 ? "0" : String(fg.fingers[s]);
+            cls += " finger" + (f === 0 ? " open-string" : "");
+            if (fg.barre && f === fg.barre.fret && s >= fg.barre.from && s <= fg.barre.to) cls += " barre-note";
+          } else if (fingersMode && st.mode === "scale") {
+            const fg = scaleFinger(f);
+            if (fg !== null) { label = String(fg); cls += " finger pick" + (f === 0 ? " open-string" : ""); }
+            else cls += " faded";
+          }
         } else if (st.showAll) {
           cls = "ghost";
         } else {
@@ -437,7 +472,9 @@ function renderTuner() {
     const label = { root: "root (R)", third: "3rd — major/minor colour", fifth: "5th", seventh: "7th", other: "other notes" };
     $("#legend").innerHTML = ["root", "third", "fifth", "seventh", "other"].filter(r => roles.includes(r))
       .map(r => `<span><i class="fb-dot role-${r}"></i> ${label[r]}</span>`).join("") +
-      (st.mode === "chord" ? `<span><i class="fb-dot role-root pick"></i> selected shape</span>` : "");
+      (st.mode === "chord" ? `<span><i class="fb-dot role-root pick"></i> selected shape</span>` : "") +
+      (st.labels === "fingers" ? `<span class="fb-finger-legend"><i class="fb-dot role-other finger">1</i> index · 2 middle · 3 ring · 4 pinky
+        <i class="fb-dot finger open-string">0</i> open string · same number on several strings = barre (pestana)</span>` : "");
   }
 
   /* ----- Chord shapes ----- */
@@ -461,7 +498,7 @@ function renderTuner() {
         title="${v.inversion ? "Inversion: the lowest note is " + a.nm(v.bassPc) + ", not the root" : ""}">
         <span class="diagram-name">${name}${v.inversion ? "/" + a.nm(v.bassPc) : ""}</span>
         ${fingeringSVG(autoFingering(v.frets), name, { lefty: prefs.lefty })}
-        <small>${shapeLabel(v)}<br><code>${fretsText(v.frets)}</code></small>
+        <small>${shapeLabel(v)}<span class="finger-count">${fingerText(v)}</span><code>${fretsText(v.frets)}</code></small>
       </button>`;
 
     let compare = "";
@@ -535,6 +572,15 @@ function renderTuner() {
     $("#clearFocus").onclick = () => { st.focus = null; drawFretboard(); drawFocus(); if (st.mode !== "notes") drawPickers(); };
   }
 
+  function positionsHTML() {
+    const cur = scalePos();
+    return `<div class="fb-pos"><span class="tool-label">Hand position</span>
+      <button class="chip" data-pos="prev" aria-label="Previous position">◀</button>
+      ${Array.from({ length: 13 }, (_, i) => `<button class="chip ${i === cur ? "on" : ""}" data-pos="${i}">${i === 0 ? "Open" : i}</button>`).join("")}
+      <button class="chip" data-pos="next" aria-label="Next position">▶</button></div>
+      <p class="hint">One finger per fret: finger 1 on fret ${cur === 0 ? "1" : cur}, finger 2 on the next fret, and so on. Only the notes your hand reaches here are numbered.</p>`;
+  }
+
   // Diatonic chords: stack every other note of a 7-note scale (1-3-5, 2-4-6, …).
   function scaleChordsHTML(a) {
     const sorted = [...a.iv].sort((x, y) => x - y);
@@ -558,6 +604,7 @@ function renderTuner() {
     if (st.voicing >= voicings.length) st.voicing = 0;
     drawTuningInfo(); drawPickers(); drawFretboard(); drawFocus(); drawLegend(); drawVoicings();
     document.querySelectorAll("[data-labels]").forEach(b => b.classList.toggle("on", b.dataset.labels === st.labels));
+    $("#fingersChip").hidden = st.mode === "notes";
     $("#showAll").checked = st.showAll;
     $("#fbLefty").checked = prefs.lefty;
   }
