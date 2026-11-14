@@ -22,6 +22,7 @@ Or publish it with GitHub Pages (Settings → Pages → deploy from branch, root
 - Strumming pattern with a "hear it" preview
 - Auto-scroll, text size, left-handed diagrams, print view
 - Chord library and a "Start here" page with tuning reference notes
+- **My lyrics sheet**: each user can add the words from their own copy in ChordPro style (`[C]word`). Chords render above the words and follow transpose. Saved only in that browser; no lyrics ship with the site
 
 ## Adding a song
 

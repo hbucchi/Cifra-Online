@@ -149,7 +149,9 @@ function renderSong(id) {
     transpose: saved.transpose ?? 0,
     capo: saved.capo ?? song.capo,
     scrolling: false,
-    speed: store.get("scrollSpeed", 3)
+    speed: store.get("scrollSpeed", 3),
+    view: store.get("view", "chart"),
+    editing: false
   };
   const save = () => store.set("song:" + id, { transpose: state.transpose, capo: state.capo });
 
@@ -196,6 +198,11 @@ function renderSong(id) {
     <p class="sounding" id="sounding"></p>
     ${song.tuning ? `<p class="callout">🎸 ${escapeHtml(song.tuning)}</p>` : ""}
 
+    <div class="view-tabs" role="tablist">
+      <button class="tab" data-view="chart" role="tab">Chord chart</button>
+      <button class="tab" data-view="mine" role="tab">My lyrics sheet</button>
+    </div>
+
     <div class="song-layout">
       <article class="sheet" id="sheet"></article>
       <aside class="sidebar">
@@ -232,7 +239,9 @@ function renderSong(id) {
 
     const sheet = $("#sheet");
     sheet.style.fontSize = prefs.fontSize + "px";
-    sheet.innerHTML = song.sections.map(sec => `
+    document.querySelectorAll(".view-tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.view === state.view));
+    if (state.view === "mine") drawMySheet(sheet);
+    else sheet.innerHTML = song.sections.map(sec => `
       <section class="section">
         <h3>${escapeHtml(sec.name)} ${sec.repeat ? `<span class="repeat">×${sec.repeat}</span>` : ""}</h3>
         ${sec.lines.map(line => `
@@ -262,6 +271,73 @@ function renderSong(id) {
     }).join("");
   }
 
+  /* ----- "My lyrics sheet": user-supplied text, stored only in this browser ----- */
+
+  // Skeleton built from the chart: section headings + chords, no words.
+  function template() {
+    return song.sections.map(sec =>
+      `# ${sec.name}${sec.repeat ? ` (x${sec.repeat})` : ""}\n` +
+      sec.lines.map(line => line.split("|").map(bar =>
+        bar.trim().split(/\s+/).map(c => `[${c}]`).join(" ")).join("    ")).join("\n")
+    ).join("\n\n");
+  }
+
+  // ChordPro-style rendering: "[C]some words [G]more words" → chords above the words.
+  function renderChordPro(text) {
+    const chordBtn = raw => {
+      const n = parseChord(raw) ? chordName(raw) : raw;
+      return `<button class="chord" data-chord="${escapeHtml(n)}">${escapeHtml(n)}</button>`;
+    };
+    return text.split("\n").map(line => {
+      if (/^#/.test(line)) return `<h3 class="cp-heading">${escapeHtml(line.replace(/^#+\s*/, ""))}</h3>`;
+      if (!line.trim()) return `<div class="cp-gap"></div>`;
+      if (!/\[[^\]]+\]/.test(line)) return `<div class="cp-line"><span class="cp-text">${escapeHtml(line)}</span></div>`;
+      const segs = [];
+      let pending = null;
+      for (const part of line.split(/(\[[^\]]+\])/)) {
+        const m = /^\[([^\]]+)\]$/.exec(part);
+        if (m) { if (pending !== null) segs.push({ chord: pending, text: "" }); pending = m[1]; }
+        else if (part) { segs.push({ chord: pending, text: part }); pending = null; }
+      }
+      if (pending !== null) segs.push({ chord: pending, text: "" });
+      return `<div class="cp-line">${segs.map(s => `<span class="cp-seg"><span class="cp-chord">${s.chord ? chordBtn(s.chord) : "&nbsp;"}</span><span class="cp-text">${escapeHtml(s.text) || "&nbsp;"}</span></span>`).join("")}</div>`;
+    }).join("");
+  }
+
+  function drawMySheet(sheet) {
+    const text = store.get("lyrics:" + id, "");
+    if (state.editing) {
+      sheet.innerHTML = `
+        <p class="hint">Type or paste the words from your own copy (CD booklet, a licensed lyrics site…).
+        Put a chord in square brackets right before the syllable where it changes, e.g. <code>[C]my words [G]here</code>.
+        Lines starting with <code>#</code> are section titles. Saved only in this browser.</p>
+        <textarea id="myText" class="my-text" spellcheck="false">${escapeHtml(text || template())}</textarea>
+        <div class="edit-actions">
+          <button class="btn primary" id="saveMine">Save</button>
+          <button class="btn" id="cancelMine">Cancel</button>
+          <button class="btn" id="resetMine">Start from chord skeleton</button>
+          ${text ? `<button class="btn danger" id="deleteMine">Delete my sheet</button>` : ""}
+        </div>`;
+      $("#saveMine").onclick = () => { store.set("lyrics:" + id, $("#myText").value); state.editing = false; drawSheet(); };
+      $("#cancelMine").onclick = () => { state.editing = false; drawSheet(); };
+      $("#resetMine").onclick = () => { $("#myText").value = template(); };
+      if ($("#deleteMine")) $("#deleteMine").onclick = () => {
+        if (confirm("Delete your lyrics sheet for this song?")) { store.set("lyrics:" + id, ""); state.editing = false; drawSheet(); }
+      };
+      return;
+    }
+    sheet.innerHTML = text
+      ? `<div class="edit-actions top"><button class="btn small" id="editMine">✎ Edit</button></div><div class="cp">${renderChordPro(text)}</div>`
+      : `<div class="empty-mine">
+           <p><strong>Build your own play-along sheet.</strong></p>
+           <p class="hint">We can't publish the lyrics, but you can add the words from your own copy.
+           We'll start you off with this song's sections and chords — you fill in the words, and the chords will sit right above them.</p>
+           <p class="hint">Example: <code>[G]Walking down the [C]road today</code></p>
+           <button class="btn primary" id="editMine">Create my sheet</button>
+         </div>`;
+    $("#editMine").onclick = () => { state.editing = true; drawSheet(); };
+  }
+
   function playChord(name, direction = "D") {
     const f = getFingering(name);
     if (f) GuitarAudio.strum(f.frets, { capo: state.capo, direction });
@@ -276,6 +352,10 @@ function renderSong(id) {
     if (btn && app.contains(btn)) playChord(btn.dataset.chord);
   }
   cleanup = () => { app.removeEventListener("click", onSongClick); stopAutoScroll(); };
+
+  document.querySelectorAll(".view-tabs .tab").forEach(t => t.onclick = () => {
+    state.view = t.dataset.view; state.editing = false; store.set("view", state.view); drawSheet();
+  });
 
   const update = () => { save(); drawSheet(); };
   $("#tUp").onclick = () => { state.transpose = (state.transpose + 1) % 12; update(); };
