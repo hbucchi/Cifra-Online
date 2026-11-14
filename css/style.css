@@ -349,3 +349,49 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-shape-btns { display: inline-flex; gap: 6px; margin-left: auto; }
 .ok { color: #059669; font-weight: 600; }
 .fb-edit-hint { margin: 8px 2px 0; }
+
+/* ---------- School ---------- */
+.school-hero .btn.primary { margin-top: 8px; }
+.progress { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; margin: 14px 0 6px; max-width: 460px; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s; }
+.trail { display: grid; gap: 10px; position: relative; }
+.lesson-card { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; text-decoration: none; color: inherit; box-shadow: var(--shadow); }
+.lesson-card:hover { border-color: var(--accent); }
+.lesson-card.next { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.lesson-num { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--bg); border: 2px solid var(--border); color: var(--muted); }
+.lesson-card.done .lesson-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lesson-card.next .lesson-num { border-color: var(--accent); color: var(--accent); }
+.lesson-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lesson-title { font-weight: 650; }
+.lesson-header .goals { list-style: none; padding: 0; margin: 8px 0 16px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.lesson-theory p, .lesson-theory li { max-width: 72ch; }
+.formula { font-size: 1.1rem; font-weight: 600; background: var(--accent-soft); padding: 8px 12px; border-radius: 8px; display: inline-block; }
+.deep-dive { border-left: 4px solid var(--chord); background: var(--chord-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 12px 0 4px; font-size: .93rem; }
+.tag.root { background: var(--c-root); color: #fff; padding: 0 6px; border-radius: 6px; }
+.mini-table { border-collapse: collapse; margin: 8px 0; font-size: .92rem; }
+.mini-table th, .mini-table td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
+.neck-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
+.mini-neck .fb-strings { cursor: pointer; }
+.fb-note.mini { cursor: default; min-width: 28px; text-align: center; }
+.mini-neck { --tune-w: 44px; }
+.legend-title { color: var(--text); }
+.player { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; background: var(--bg); }
+.player-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.player-head > div { flex: 1; min-width: 200px; }
+.play-btn { width: 52px; height: 52px; border-radius: 50%; border: none; background: var(--accent); color: #fff; font-size: 1.3rem; cursor: pointer; flex: none; }
+.player-row { margin-top: 8px; align-items: center; }
+.player-row .chip { min-width: 40px; }
+.vol input { width: 90px; accent-color: var(--accent); }
+.pill small { font-weight: 500; opacity: .75; }
+.metronome { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 12px; }
+.metronome input { accent-color: var(--accent); }
+.beats { display: inline-flex; gap: 6px; }
+.beats i { width: 14px; height: 14px; border-radius: 50%; background: var(--border); transition: background .05s; }
+.beats i.on { background: var(--chord); }
+.beats i:first-child.on { background: var(--c-root); }
+.checklist { padding-left: 20px; }
+.checklist li { margin-bottom: 8px; }
+.checklist input { accent-color: var(--accent); transform: scale(1.15); margin-right: 4px; }
+.checklist input:checked + span { color: var(--muted); text-decoration: line-through; }
+.lesson-nav { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
+#completeBtn.done { background: var(--c-fifth); border-color: var(--c-fifth); }
