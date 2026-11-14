@@ -332,3 +332,10 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-pos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
 .fb-pos .chip { min-width: 40px; padding: 4px 10px; }
 .finger-count { display: block; font-weight: 600; color: var(--text); }
+
+/* Bar above the neck: current tuning + back to standard */
+.fb-stage-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; font-size: .92rem; }
+.fb-stage-bar strong { letter-spacing: .08em; color: var(--chord); }
+.btn:disabled { opacity: .45; cursor: default; border-color: var(--border); }
+#stdBtn:not(:disabled) { background: var(--accent); color: #fff; border-color: var(--accent); }
+@media (orientation: landscape) and (max-height: 540px) { .fb-stage-bar { margin-bottom: 4px; font-size: .82rem; } }

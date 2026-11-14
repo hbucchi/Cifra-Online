@@ -216,7 +216,7 @@ function renderTuner() {
         <label class="tool"><span class="tool-label">Tuning</span>
           <select id="preset"></select></label>
         <button class="btn" id="strumOpen">▶ Strum open strings</button>
-        <button class="btn" id="resetTuning">Reset to standard</button>
+        <button class="btn" id="resetTuning">↺ Standard tuning (E A D G B E)</button>
       </div>
       <div id="tuningInfo" class="fb-tuning-info"></div>
     </section>
@@ -244,6 +244,10 @@ function renderTuner() {
     <p class="hint rotate-hint">📱↻ Turn your phone sideways to see the whole neck.</p>
 
     <div class="fb-stage" id="stage">
+      <div class="fb-stage-bar">
+        <span class="fb-stage-tuning" id="stageTuning"></span>
+        <button class="btn small" id="stdBtn">↺ Standard tuning (E A D G B E)</button>
+      </div>
       <div class="fb-wrap"><div class="fb" id="fb"></div></div>
       <div id="focusInfo" class="fb-focus"></div>
       <div id="legend" class="fb-legend"></div>
@@ -300,6 +304,12 @@ function renderTuner() {
   function drawTuningInfo() {
     const preset = TUNING_PRESETS.find(p => p.notes.every((n, k) => n === st.tuning[k]));
     $("#preset").value = preset ? preset.id : "custom";
+    const isStd = st.tuning.every((m, k) => m === STANDARD_TUNING[k]);
+    $("#stageTuning").innerHTML = `Tuning: <strong>${st.tuning.map(m => noteName(m, false)).join(" ")}</strong>${isStd ? " (standard)" : ""}`;
+    for (const id of ["#stdBtn", "#resetTuning"]) {
+      $(id).disabled = isStd;
+      $(id).title = isStd ? "Already in standard tuning" : "Retune all strings to E A D G B E";
+    }
     const flats = false;
     const changes = st.tuning.map((m, s) => ({ s, m, d: m - STANDARD_TUNING[s] })).filter(x => x.d !== 0);
     const openChord = detectChord(st.tuning);
@@ -624,7 +634,9 @@ function renderTuner() {
     st.tuning = [...p.notes]; st.voicing = 0; save(); drawAll();
     GuitarAudio.strumMidis(st.tuning);
   };
-  $("#resetTuning").onclick = () => { st.tuning = [...STANDARD_TUNING]; st.voicing = 0; save(); drawAll(); };
+  const toStandard = () => { st.tuning = [...STANDARD_TUNING]; st.voicing = 0; save(); drawAll(); GuitarAudio.strumMidis(st.tuning); };
+  $("#resetTuning").onclick = toStandard;
+  $("#stdBtn").onclick = toStandard;
   $("#strumOpen").onclick = () => GuitarAudio.strumMidis(st.tuning);
   document.querySelectorAll(".fb-modes .tab").forEach(t => t.onclick = () => { st.mode = t.dataset.mode; st.voicing = 0; save(); drawAll(); });
   document.querySelectorAll("[data-labels]").forEach(b => b.onclick = () => { st.labels = b.dataset.labels; save(); drawAll(); });
