@@ -520,6 +520,7 @@ function renderLearn() {
         <button class="string-btn" data-string="${i}"><b>${s.name}<sub>${s.octave}</sub></b><small>${s.freq.toFixed(1)} Hz</small></button>`).join("")}
       </div>
       <p class="hint">Each string is 5 frets (semitones) above the previous one — except G→B, which is 4. That's why the 5th-fret tuning trick works.</p>
+      <p><a class="btn" href="#/tuner">Open the Fretboard &amp; Tuner →</a> to try other tunings and see what they change.</p>
     </section>
 
     <section class="learn-card">
@@ -578,6 +579,7 @@ function route() {
   else if (parts[0] === "song" && parts[1]) renderSong(parts[1]);
   else if (parts[0] === "artist" && parts[1]) renderArtist(parts[1]);
   else if (parts[0] === "chords") renderChords();
+  else if (parts[0] === "tuner") renderTuner();
   else if (parts[0] === "learn") renderLearn();
   else renderNotFound();
   window.scrollTo(0, 0);

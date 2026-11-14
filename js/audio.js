@@ -81,5 +81,23 @@ const GuitarAudio = (() => {
     return pattern.length * eighth;
   }
 
-  return { strum, playString, playPattern };
+  // MIDI note number → frequency. A4 = MIDI 69 = 440 Hz; each semitone ×2^(1/12).
+  const midiFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  function playMidi(m, when = 0, gain = 0.4) {
+    playFreq(midiFreq(m), when, gain);
+  }
+
+  // Strum a list of MIDI notes (low → high); null entries are skipped.
+  function strumMidis(midis, { direction = "D", spread = 0.035, gain = 0.3 } = {}) {
+    const list = midis.filter(m => m !== null && m !== undefined);
+    if (direction === "U") list.reverse();
+    list.forEach((m, k) => playFreq(midiFreq(m), k * spread, gain));
+  }
+
+  function playSequence(midis, gap = 0.28) {
+    midis.forEach((m, k) => playFreq(midiFreq(m), k * gap, 0.4));
+  }
+
+  return { strum, playString, playPattern, playMidi, strumMidis, playSequence, midiFreq };
 })();

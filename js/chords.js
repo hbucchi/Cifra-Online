@@ -165,6 +165,37 @@ function getFingering(name) {
 function chordDiagramSVG(name, opts = {}) {
   const f = getFingering(name);
   if (!f) return "";
+  return fingeringSVG(f, name, opts);
+}
+
+/*
+ * Guess a natural fingering for any fret pattern: if the lowest fret is
+ * pressed on 2+ strings with nothing lower in between, use a barre (finger 1);
+ * the remaining notes get fingers 2, 3, 4 from low fret to high fret.
+ */
+function autoFingering(frets) {
+  const fretted = frets.map((f, s) => ({ f, s })).filter(x => x.f > 0);
+  const fingers = frets.map(() => 0);
+  if (!fretted.length) return { frets, fingers, barre: null };
+  const minF = Math.min(...fretted.map(x => x.f));
+  const atMin = fretted.filter(x => x.f === minF).map(x => x.s);
+  let barre = null;
+  if (atMin.length >= 2) {
+    const from = Math.min(...atMin), to = Math.max(...atMin);
+    let ok = true;
+    for (let s = from; s <= to; s++) if (frets[s] < minF) ok = false;
+    if (ok) barre = { fret: minF, from, to };
+  }
+  let next = 1;
+  if (barre) { atMin.forEach(s => { fingers[s] = 1; }); next = 2; }
+  fretted
+    .filter(x => !(barre && x.f === minF))
+    .sort((a, b) => a.f - b.f || a.s - b.s)
+    .forEach(x => { fingers[x.s] = Math.min(4, next++); });
+  return { frets, fingers, barre };
+}
+
+function fingeringSVG(f, name, opts = {}) {
   const lefty = !!opts.lefty;
   const frets = lefty ? [...f.frets].reverse() : f.frets;
   const fingers = lefty ? [...f.fingers].reverse() : f.fingers;
