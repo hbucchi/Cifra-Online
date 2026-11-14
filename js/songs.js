@@ -260,8 +260,26 @@ const SONGS = [
   }
 ];
 
-const ARTIST = {
-  name: "The Beatles",
-  id: "the-beatles",
-  blurb: "Liverpool, 1960–1970. Simple chords, unforgettable songs — the perfect place to start on acoustic guitar."
-};
+const ARTISTS = [
+  {
+    id: "the-beatles",
+    name: "The Beatles",
+    blurb: "Liverpool, 1960–1970. Simple chords, unforgettable songs — the perfect place to start on acoustic guitar.",
+    note: "Chord charts only: these lyrics are copyrighted. Use “My lyrics sheet” to add the words from your own copy."
+  },
+  {
+    id: "folk-classics",
+    name: "Folk & Public Domain Classics",
+    blurb: "Traditional songs and classics whose copyright has expired — full lyrics with chords above the words.",
+    note: "Public domain: free to use, with full lyrics."
+  },
+  {
+    id: "brasil-dominio-publico",
+    name: "Brasil — Domínio Público",
+    blurb: "Cantigas de roda, modinhas e marchinhas tradicionais: letra completa e cifra.",
+    note: "Domínio público: letra completa liberada."
+  }
+];
+
+// Beatles songs belong to the Beatles artist page.
+SONGS.forEach(s => { if (!s.artist) s.artist = "the-beatles"; });

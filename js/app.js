@@ -38,6 +38,10 @@ function escapeHtml(s) {
 
 function songChords(song) {
   const set = [];
+  if (song.lyrics) {
+    for (const m of song.lyrics.matchAll(/\[([^\]]+)\]/g)) if (!set.includes(m[1])) set.push(m[1]);
+    return set;
+  }
   song.sections.forEach(sec => sec.lines.forEach(line =>
     line.split("|").forEach(bar => bar.trim().split(/\s+/).forEach(ch => {
       if (ch && !set.includes(ch)) set.push(ch);
@@ -63,49 +67,91 @@ function setActiveNav(route) {
   document.querySelectorAll(".nav a").forEach(a => a.classList.toggle("active", a.dataset.route === route));
 }
 
-/* ---------- Home ---------- */
+/* ---------- Home & artist pages ---------- */
+
+const artistById = id => ARTISTS.find(a => a.id === id);
+
+function songMeta(s) {
+  const origin = s.publicDomain ? escapeHtml(s.author) : `${escapeHtml(s.album)} · ${s.year}`;
+  return `${origin} · Key ${s.key}${s.capo ? ` · Capo ${s.capo}` : ""}`;
+}
 
 function renderHome() {
   setActiveNav("home");
-  document.title = "The Beatles — Cifra Online";
-  const query = store.get("query", "");
-  const levelFilter = store.get("levelFilter", 0);
-  const favOnly = store.get("favOnly", false);
-
+  document.title = "Cifra Online — easy guitar chords for beginners";
   app.innerHTML = `
     <section class="hero">
-      <div>
-        <p class="eyebrow">Artist</p>
-        <h1>${ARTIST.name}</h1>
-        <p class="lead">${ARTIST.blurb}</p>
-        <p class="stats"><strong>${SONGS.length}</strong> songs · chord charts, diagrams &amp; strumming patterns</p>
-      </div>
+      <p class="eyebrow">Acoustic guitar for beginners</p>
+      <h1>Learn songs you love, one chord at a time</h1>
+      <p class="lead">Chord diagrams, strumming patterns, transpose &amp; capo. Public-domain songs come with full lyrics.</p>
+      <p class="stats"><strong>${SONGS.length}</strong> songs · <strong>${ARTISTS.length}</strong> artists</p>
     </section>
+    <h2>Artists</h2>
+    <div class="artist-grid">${ARTISTS.map(a => {
+      const n = SONGS.filter(s => s.artist === a.id).length;
+      return `<a class="artist-card" href="#/artist/${a.id}">
+        <span class="artist-name">${escapeHtml(a.name)}</span>
+        <span class="song-meta">${n} songs</span>
+        <span class="artist-note">${escapeHtml(a.note)}</span>
+      </a>`;
+    }).join("")}</div>
+    <h2>All songs</h2>
+    ${songListShell()}
+  `;
+  bindSongList(null);
+}
 
+function renderArtist(id) {
+  const artist = artistById(id);
+  if (!artist) return renderNotFound();
+  setActiveNav("home");
+  document.title = `${artist.name} — Cifra Online`;
+  const n = SONGS.filter(s => s.artist === id).length;
+  app.innerHTML = `
+    <nav class="crumbs"><a href="#/">Home</a> › <span>${escapeHtml(artist.name)}</span></nav>
+    <section class="hero">
+      <p class="eyebrow">Artist</p>
+      <h1>${escapeHtml(artist.name)}</h1>
+      <p class="lead">${escapeHtml(artist.blurb)}</p>
+      <p class="stats"><strong>${n}</strong> songs · ${escapeHtml(artist.note)}</p>
+    </section>
+    ${songListShell()}
+  `;
+  bindSongList(id);
+}
+
+function songListShell() {
+  const levelFilter = store.get("levelFilter", 0);
+  return `
     <section class="filters">
-      <input type="search" id="search" placeholder="Search a song or chord (e.g. “Hey Jude” or “Am”)" value="${escapeHtml(query)}" aria-label="Search songs">
+      <input type="search" id="search" placeholder="Search a song or chord (e.g. “Hey Jude” or “Am”)" value="${escapeHtml(store.get("query", ""))}" aria-label="Search songs">
       <div class="chips" role="group" aria-label="Difficulty">
         ${[[0, "All"], [1, "Beginner"], [2, "Easy"], [3, "Intermediate"]].map(([v, l]) =>
           `<button class="chip ${levelFilter === v ? "on" : ""}" data-level="${v}">${l}</button>`).join("")}
-        <button class="chip ${favOnly ? "on" : ""}" id="favOnly">★ Favourites</button>
+        <button class="chip ${store.get("favOnly", false) ? "on" : ""}" id="favOnly">★ Favourites</button>
+        <button class="chip ${store.get("lyricsOnly", false) ? "on" : ""}" id="lyricsOnly">♪ With lyrics</button>
       </div>
     </section>
+    <section id="songList" class="song-list"></section>`;
+}
 
-    <section id="songList" class="song-list"></section>
-  `;
-
+function bindSongList(artistId) {
   const draw = () => {
     const q = store.get("query", "").trim().toLowerCase();
     const lv = store.get("levelFilter", 0);
     const fo = store.get("favOnly", false);
+    const lo = store.get("lyricsOnly", false);
     const favs = favorites();
     const list = SONGS
+      .filter(s => !artistId || s.artist === artistId)
       .filter(s => !lv || s.level === lv)
       .filter(s => !fo || favs.includes(s.id))
+      .filter(s => !lo || s.publicDomain)
       .filter(s => {
         if (!q) return true;
         const chords = songChords(s).map(c => c.toLowerCase());
-        return s.title.toLowerCase().includes(q) || s.album.toLowerCase().includes(q) || chords.includes(q);
+        const artist = artistById(s.artist).name.toLowerCase();
+        return s.title.toLowerCase().includes(q) || artist.includes(q) || chords.includes(q);
       })
       .sort((a, b) => a.level - b.level || a.title.localeCompare(b.title));
 
@@ -113,8 +159,8 @@ function renderHome() {
       <a class="song-card" href="#/song/${s.id}">
         <span class="rank">${i + 1}</span>
         <span class="song-main">
-          <span class="song-title">${escapeHtml(s.title)} ${favs.includes(s.id) ? '<span class="star">★</span>' : ""}</span>
-          <span class="song-meta">${escapeHtml(s.album)} · ${s.year} · Key ${s.key}${s.capo ? ` · Capo ${s.capo}` : ""}</span>
+          <span class="song-title">${escapeHtml(s.title)} ${s.publicDomain ? '<span class="badge">Lyrics</span>' : ""} ${favs.includes(s.id) ? '<span class="star">★</span>' : ""}</span>
+          <span class="song-meta">${artistId ? "" : escapeHtml(artistById(s.artist).name) + " · "}${songMeta(s)}</span>
           <span class="chord-pills">${songChords(s).map(c => `<span class="pill">${c}</span>`).join("")}</span>
         </span>
         ${levelDots(s.level)}
@@ -127,12 +173,14 @@ function renderHome() {
     document.querySelectorAll(".chip[data-level]").forEach(b => b.classList.toggle("on", b === btn));
     draw();
   }));
-  $("#favOnly").addEventListener("click", e => {
-    const v = !store.get("favOnly", false);
-    store.set("favOnly", v);
-    e.currentTarget.classList.toggle("on", v);
-    draw();
-  });
+  for (const key of ["favOnly", "lyricsOnly"]) {
+    $("#" + key).addEventListener("click", e => {
+      const v = !store.get(key, false);
+      store.set(key, v);
+      e.currentTarget.classList.toggle("on", v);
+      draw();
+    });
+  }
   draw();
 }
 
@@ -142,7 +190,8 @@ function renderSong(id) {
   const song = SONGS.find(s => s.id === id);
   if (!song) return renderNotFound();
   setActiveNav("home");
-  document.title = `${song.title} — ${ARTIST.name} — Cifra Online`;
+  const artist = artistById(song.artist);
+  document.title = `${song.title} — ${artist.name} — Cifra Online`;
 
   const saved = store.get("song:" + id, {});
   const state = {
@@ -150,18 +199,18 @@ function renderSong(id) {
     capo: saved.capo ?? song.capo,
     scrolling: false,
     speed: store.get("scrollSpeed", 3),
-    view: store.get("view", "chart"),
+    view: song.publicDomain ? "chart" : store.get("view", "chart"),
     editing: false
   };
   const save = () => store.set("song:" + id, { transpose: state.transpose, capo: state.capo });
 
   app.innerHTML = `
-    <nav class="crumbs"><a href="#/">${ARTIST.name}</a> › <span>${escapeHtml(song.title)}</span></nav>
+    <nav class="crumbs"><a href="#/">Home</a> › <a href="#/artist/${artist.id}">${escapeHtml(artist.name)}</a> › <span>${escapeHtml(song.title)}</span></nav>
     <header class="song-header">
       <div>
         <h1>${escapeHtml(song.title)}</h1>
-        <p class="song-artist">${ARTIST.name} · <em>${escapeHtml(song.album)}</em> (${song.year})</p>
-        <p class="song-facts">${levelDots(song.level)} <span>♩ = ${song.bpm}</span> <span>Record key: ${song.originalKey}</span></p>
+        <p class="song-artist"><a href="#/artist/${artist.id}">${escapeHtml(artist.name)}</a> · ${song.publicDomain ? escapeHtml(song.author) : `<em>${escapeHtml(song.album)}</em> (${song.year})`}</p>
+        <p class="song-facts">${levelDots(song.level)} <span>♩ = ${song.bpm}</span> <span>${song.timeSig || "4/4"}</span> <span>Record key: ${song.originalKey}</span></p>
       </div>
       <button class="icon-btn fav ${favorites().includes(id) ? "on" : ""}" id="favBtn" aria-label="Toggle favourite">★</button>
     </header>
@@ -198,7 +247,7 @@ function renderSong(id) {
     <p class="sounding" id="sounding"></p>
     ${song.tuning ? `<p class="callout">🎸 ${escapeHtml(song.tuning)}</p>` : ""}
 
-    <div class="view-tabs" role="tablist">
+    <div class="view-tabs" role="tablist" ${song.publicDomain ? "hidden" : ""}>
       <button class="tab" data-view="chart" role="tab">Chord chart</button>
       <button class="tab" data-view="mine" role="tab">My lyrics sheet</button>
     </div>
@@ -214,13 +263,15 @@ function renderSong(id) {
           <h2>Strumming</h2>
           <div class="strum" id="strum"></div>
           <button class="btn small" id="playStrum">▶ Hear it</button>
-          <p class="hint">Count “1 &amp; 2 &amp; 3 &amp; 4 &amp;”. Keep your hand moving down-up all the time — only touch the strings on the arrows.</p>
+          <p class="hint">Count “${song.strum.length === 6 ? "1 &amp; 2 &amp; 3 &amp;" : "1 &amp; 2 &amp; 3 &amp; 4 &amp;"}”. Keep your hand moving down-up all the time — only touch the strings on the arrows.</p>
         </section>
         <section class="panel">
           <h2>Tips</h2>
           <ul class="tips">${song.tips.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
         </section>
-        <p class="hint copyright">Lyrics aren't shown for copyright reasons — play along with the recording.</p>
+        <p class="hint copyright">${song.publicDomain
+          ? "Public domain — these lyrics are free to use."
+          : "Lyrics aren't shown for copyright reasons — use “My lyrics sheet” to add your own."}</p>
       </aside>
     </div>
   `;
@@ -241,6 +292,7 @@ function renderSong(id) {
     sheet.style.fontSize = prefs.fontSize + "px";
     document.querySelectorAll(".view-tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.view === state.view));
     if (state.view === "mine") drawMySheet(sheet);
+    else if (song.lyrics) sheet.innerHTML = `<div class="cp">${renderChordPro(song.lyrics)}</div>`;
     else sheet.innerHTML = song.sections.map(sec => `
       <section class="section">
         <h3>${escapeHtml(sec.name)} ${sec.repeat ? `<span class="repeat">×${sec.repeat}</span>` : ""}</h3>
@@ -264,7 +316,7 @@ function renderSong(id) {
       </button>`;
     }).join("");
 
-    $("#strum").innerHTML = ["1", "&", "2", "&", "3", "&", "4", "&"].map((count, i) => {
+    $("#strum").innerHTML = ["1", "&", "2", "&", "3", "&", "4", "&"].slice(0, song.strum.length).map((count, i) => {
       const s = song.strum[i];
       const arrow = s === "D" ? "↓" : s === "U" ? "↑" : "·";
       return `<span class="beat ${s === "-" ? "rest" : ""}"><b>${arrow}</b><small>${count}</small></span>`;
@@ -524,6 +576,7 @@ function route() {
   const parts = hash.split("/").filter(Boolean);
   if (parts.length === 0) renderHome();
   else if (parts[0] === "song" && parts[1]) renderSong(parts[1]);
+  else if (parts[0] === "artist" && parts[1]) renderArtist(parts[1]);
   else if (parts[0] === "chords") renderChords();
   else if (parts[0] === "learn") renderLearn();
   else renderNotFound();

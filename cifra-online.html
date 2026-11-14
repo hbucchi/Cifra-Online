@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cifra Online — Beatles chords for beginners</title>
+  <title>Cifra Online — easy guitar chords for beginners</title>
   <meta name="description" content="Easy acoustic guitar chord charts for Beatles songs: diagrams, strumming patterns, transpose and capo.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎸</text></svg>">
   <style>
@@ -209,6 +209,16 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .cp-gap { height: .8em; }
 @media print { .view-tabs, .edit-actions { display: none !important; } }
 
+/* Artists */
+.artist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.artist-card { display: flex; flex-direction: column; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; text-decoration: none; color: inherit; box-shadow: var(--shadow); }
+.artist-card:hover { border-color: var(--accent); }
+.artist-name { font-weight: 700; font-size: 1.1rem; }
+.artist-note { font-size: .85rem; color: var(--muted); }
+.badge { font-size: .7rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 1px 8px; border-radius: 999px; vertical-align: middle; }
+.song-artist a { color: inherit; }
+.view-tabs[hidden] { display: none; }
+
 </style>
 </head>
 <body>
@@ -226,7 +236,7 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
   <main id="app" class="container"></main>
 
   <footer class="footer">
-    <p>Cifra Online · Chord charts for learning purposes. Song lyrics are not reproduced.</p>
+    <p>Cifra Online · Chord charts for learning purposes. Lyrics shown only for public-domain songs.</p>
   </footer>
 
   <script>
@@ -492,11 +502,380 @@ const SONGS = [
   }
 ];
 
-const ARTIST = {
-  name: "The Beatles",
-  id: "the-beatles",
-  blurb: "Liverpool, 1960–1970. Simple chords, unforgettable songs — the perfect place to start on acoustic guitar."
-};
+const ARTISTS = [
+  {
+    id: "the-beatles",
+    name: "The Beatles",
+    blurb: "Liverpool, 1960–1970. Simple chords, unforgettable songs — the perfect place to start on acoustic guitar.",
+    note: "Chord charts only: these lyrics are copyrighted. Use “My lyrics sheet” to add the words from your own copy."
+  },
+  {
+    id: "folk-classics",
+    name: "Folk & Public Domain Classics",
+    blurb: "Traditional songs and classics whose copyright has expired — full lyrics with chords above the words.",
+    note: "Public domain: free to use, with full lyrics."
+  },
+  {
+    id: "brasil-dominio-publico",
+    name: "Brasil — Domínio Público",
+    blurb: "Cantigas de roda, modinhas e marchinhas tradicionais: letra completa e cifra.",
+    note: "Domínio público: letra completa liberada."
+  }
+];
+
+// Beatles songs belong to the Beatles artist page.
+SONGS.forEach(s => { if (!s.artist) s.artist = "the-beatles"; });
+
+</script>
+  <script>
+/*
+ * Public-domain songs: full lyrics with inline chords (ChordPro style).
+ *
+ * Only texts that are out of copyright are included: traditional songs, or
+ * songs whose authors died more than 70 years ago (Brazil: life + 70 years,
+ * Lei 9.610/98, art. 41). Modern arrangements/translations are NOT used.
+ *
+ * Lyrics format: "[C]word" puts the chord C above "word"; lines starting
+ * with "#" are section titles.
+ * strum: 8 slots for 4/4, 6 slots for 3/4 ("1 & 2 & 3 &").
+ */
+const PD_SONGS = [
+  {
+    id: "amazing-grace",
+    artist: "folk-classics",
+    title: "Amazing Grace",
+    author: "John Newton (lyrics, 1779) · traditional melody",
+    key: "G", capo: 0, originalKey: "G", bpm: 80, level: 1,
+    timeSig: "3/4", strum: "D-DUDU",
+    tips: [
+      "A waltz: count 1-2-3, 1-2-3. Strum a strong down-strum on '1'.",
+      "G → G7 only changes one note — move your finger from the 3rd fret to the 1st fret of the high E string.",
+      "Every verse uses exactly the same chords."
+    ],
+    lyrics: `# Verse 1
+A[G]mazing grace, how [G7]sweet the [C]sound
+That [G]saved a wretch like [D]me
+I [G]once was lost, but [G7]now am [C]found
+Was [G]blind, but [D]now I [G]see
+
+# Verse 2
+'Twas [G]grace that taught my [G7]heart to [C]fear
+And [G]grace my fears re[D]lieved
+How [G]precious did that [G7]grace ap[C]pear
+The [G]hour I [D]first be[G]lieved
+
+# Verse 3
+Through [G]many dangers, [G7]toils and [C]snares
+I [G]have already [D]come
+'Tis [G]grace hath brought me [G7]safe thus [C]far
+And [G]grace will [D]lead me [G]home
+
+# Verse 4
+When [G]we've been there ten [G7]thousand [C]years
+Bright [G]shining as the [D]sun
+We've [G]no less days to [G7]sing God's [C]praise
+Than [G]when we'd [D]first be[G]gun`
+  },
+  {
+    id: "oh-susanna",
+    artist: "folk-classics",
+    title: "Oh! Susanna",
+    author: "Stephen Foster, 1848",
+    key: "C", capo: 0, originalKey: "C", bpm: 110, level: 1,
+    strum: "D-DUD-DU",
+    tips: [
+      "Only three chords: C, F and G7.",
+      "Most of the song is C ↔ G7. Practise that switch until you don't need to look.",
+      "Bouncy and cheerful — keep the strum light."
+    ],
+    lyrics: `# Verse 1
+I [C]come from Alabama with my [G7]banjo on my knee
+I'm [C]going to Louisiana, my [G7]true love for to [C]see
+It [C]rained all night the day I left, the [G7]weather it was dry
+The [C]sun so hot I froze to death, Su[G7]sanna, don't you [C]cry
+
+# Chorus
+[F]Oh! Susanna, oh [C]don't you cry for [G7]me
+For I [C]come from Alabama with my [G7]banjo on my [C]knee
+
+# Verse 2
+I [C]had a dream the other night when [G7]everything was still
+I [C]thought I saw Susanna a-[G7]coming down the [C]hill
+The [C]buckwheat cake was in her mouth, the [G7]tear was in her eye
+Says [C]I, I'm coming from the south, Su[G7]sanna, don't you [C]cry
+
+# Chorus
+[F]Oh! Susanna, oh [C]don't you cry for [G7]me
+For I [C]come from Alabama with my [G7]banjo on my [C]knee`
+  },
+  {
+    id: "when-the-saints",
+    artist: "folk-classics",
+    title: "When the Saints Go Marching In",
+    author: "Traditional (spiritual)",
+    key: "C", capo: 0, originalKey: "C", bpm: 120, level: 1,
+    strum: "D-DUD-DU",
+    tips: [
+      "C, F, G7 — plus C7 as a 'bridge' into F. C7 adds your pinky to the C shape.",
+      "Great for practising changes in time: sing slowly and change exactly on the word."
+    ],
+    lyrics: `# Verse 1
+Oh when the [C]saints go marching in
+Oh when the saints go marching [G7]in
+Oh Lord, I [C]want to [C7]be in that [F]number
+When the [C]saints go [G7]marching [C]in
+
+# Verse 2
+Oh when the [C]sun refuse to shine
+Oh when the sun refuse to [G7]shine
+Oh Lord, I [C]want to [C7]be in that [F]number
+When the [C]sun re[G7]fuse to [C]shine
+
+# Verse 3
+Oh when the [C]trumpet sounds the call
+Oh when the trumpet sounds the [G7]call
+Oh Lord, I [C]want to [C7]be in that [F]number
+When the [C]trumpet [G7]sounds the [C]call
+
+# Verse 1 (again)
+Oh when the [C]saints go marching in
+Oh when the saints go marching [G7]in
+Oh Lord, I [C]want to [C7]be in that [F]number
+When the [C]saints go [G7]marching [C]in`
+  },
+  {
+    id: "my-bonnie",
+    artist: "folk-classics",
+    title: "My Bonnie Lies Over the Ocean",
+    author: "Traditional (Scottish)",
+    key: "G", capo: 0, originalKey: "G", bpm: 100, level: 1,
+    timeSig: "3/4", strum: "D-DUDU",
+    tips: [
+      "The Beatles recorded this song with Tony Sheridan in 1961 — these are the traditional words.",
+      "Waltz time: 1-2-3. A7 → D is a nice new change to learn.",
+      "D7 → G 'resolves' — your ear hears it as coming home."
+    ],
+    lyrics: `# Verse 1
+My [G]Bonnie lies [C]over the [G]ocean
+My [G]Bonnie lies [A7]over the [D]sea
+My [G]Bonnie lies [C]over the [G]ocean
+Oh [C]bring back my [D7]Bonnie to [G]me
+
+# Chorus
+[G]Bring back, [C]bring back
+Oh [D7]bring back my Bonnie to [G]me, to me
+[G]Bring back, [C]bring back
+Oh [D7]bring back my Bonnie to [G]me
+
+# Verse 2
+Last [G]night as I [C]lay on my [G]pillow
+Last [G]night as I [A7]lay on my [D]bed
+Last [G]night as I [C]lay on my [G]pillow
+I [C]dreamt that my [D7]Bonnie was [G]dead
+
+# Verse 3
+Oh [G]blow ye winds [C]over the [G]ocean
+And [G]blow ye winds [A7]over the [D]sea
+Oh [G]blow ye winds [C]over the [G]ocean
+And [C]bring back my [D7]Bonnie to [G]me
+
+# Verse 4
+The [G]winds have blown [C]over the [G]ocean
+The [G]winds have blown [A7]over the [D]sea
+The [G]winds have blown [C]over the [G]ocean
+And [C]brought back my [D7]Bonnie to [G]me`
+  },
+  {
+    id: "scarborough-fair",
+    artist: "folk-classics",
+    title: "Scarborough Fair",
+    author: "Traditional (English ballad)",
+    key: "Am", capo: 0, originalKey: "Am", bpm: 92, level: 2,
+    timeSig: "3/4", strum: "D-D-D-",
+    tips: [
+      "These are the old traditional verses (not a modern arrangement).",
+      "Minor key, slow and gentle — try fingerpicking: thumb on the bass, then 3 fingers up.",
+      "Am → D: lift your fingers together and keep your wrist relaxed."
+    ],
+    lyrics: `# Verse 1
+[Am]Are you going to [G]Scarborough [Am]Fair?
+[C]Parsley, [Am]sage, rose[D]mary and [Am]thyme
+Re[Am]member me [C]to one who [G]lives there
+For [Am]once she was a [G]true love of [Am]mine
+
+# Verse 2
+[Am]Tell her to make me a [G]cambric [Am]shirt
+[C]Parsley, [Am]sage, rose[D]mary and [Am]thyme
+With[Am]out any [C]seam or [G]needlework
+And [Am]then she shall be a [G]true love of [Am]mine
+
+# Verse 3
+[Am]Tell her to wash it in [G]yonder dry [Am]well
+[C]Parsley, [Am]sage, rose[D]mary and [Am]thyme
+Where [Am]water ne'er [C]sprung, nor [G]drop of rain fell
+And [Am]then she shall be a [G]true love of [Am]mine
+
+# Verse 4
+[Am]Tell her to dry it on [G]yonder [Am]thorn
+[C]Parsley, [Am]sage, rose[D]mary and [Am]thyme
+Which [Am]never bore [C]blossom since [G]Adam was born
+And [Am]then she shall be a [G]true love of [Am]mine`
+  },
+  {
+    id: "greensleeves",
+    artist: "folk-classics",
+    title: "Greensleeves",
+    author: "Traditional (England, 16th century)",
+    key: "Am", capo: 0, originalKey: "Am", bpm: 96, level: 2,
+    timeSig: "3/4", strum: "D-DUDU",
+    tips: [
+      "Over 400 years old! Am, G, F, E and C.",
+      "E (major) in a song in A minor gives that 'ancient' sound — it pulls strongly back to Am.",
+      "F is the mini-F: just four strings."
+    ],
+    lyrics: `# Verse 1
+A[Am]las, my [G]love, you [F]do me [E]wrong
+To [Am]cast me [G]off dis[E]courteously
+For [Am]I have [G]loved you [F]well and [E]long
+De[Am]lighting [E]in your [Am]company
+
+# Chorus
+[C]Greensleeves was [G]all my joy
+[Am]Greensleeves was [E]my delight
+[C]Greensleeves was my [G]heart of gold
+And [Am]who but my [E]lady [Am]Greensleeves
+
+# Verse 2
+I [Am]have been [G]ready [F]at your [E]hand
+To [Am]grant what[G]ever [E]you would crave
+I [Am]have both [G]wagered [F]life and [E]land
+Your [Am]love and [E]good-will [Am]for to have
+
+# Chorus
+[C]Greensleeves was [G]all my joy
+[Am]Greensleeves was [E]my delight
+[C]Greensleeves was my [G]heart of gold
+And [Am]who but my [E]lady [Am]Greensleeves`
+  },
+  {
+    id: "danny-boy",
+    artist: "folk-classics",
+    title: "Danny Boy",
+    author: "Frederic Weatherly (lyrics, 1913) · melody: Londonderry Air (traditional)",
+    key: "C", capo: 0, originalKey: "C", bpm: 70, level: 3,
+    strum: "D-D-DUDU",
+    tips: [
+      "A stretch goal: more chords (C7, D7, Am) and a wide melody.",
+      "Play slowly and let each chord ring. Fingerpicking sounds beautiful here.",
+      "D7 → G: a 'secondary dominant' — it makes G feel like a temporary home."
+    ],
+    lyrics: `# Verse 1
+Oh [C]Danny boy, the [C7]pipes, the [F]pipes are [C]calling
+From glen to [Am]glen, and [D7]down the mountain [G]side
+The [C]summer's gone, and [C7]all the [F]roses [C]falling
+'Tis [C]you, 'tis [Am]you must [G7]go and I must [C]bide
+But come ye [F]back when [G]summer's in the [C]meadow
+Or [Am]when the valley's [F]hushed and white with [G]snow
+'Tis I'll be [C]here in [C7]sunshine or in [F]shadow
+Oh Danny [C]boy, oh [Am]Danny [G7]boy, I love you [C]so
+
+# Verse 2
+But [C]when ye come, and [C7]all the [F]flowers are [C]dying
+If I am [Am]dead, as [D7]dead I well may [G]be
+Ye'll [C]come and find the [C7]place where [F]I am [C]lying
+And [C]kneel and [Am]say an [G7]Ave there for [C]me
+And I shall [F]hear, though [G]soft you tread a[C]bove me
+And [Am]all my grave will [F]warmer, sweeter [G]be
+For you will [C]bend and [C7]tell me that you [F]love me
+And I shall [C]sleep in [Am]peace un[G7]til you come to [C]me`
+  },
+
+  /* ---------- Brasil: domínio público ---------- */
+  {
+    id: "ciranda-cirandinha",
+    artist: "brasil-dominio-publico",
+    title: "Ciranda, Cirandinha",
+    author: "Tradicional (cantiga de roda)",
+    key: "C", capo: 0, originalKey: "C", bpm: 104, level: 1,
+    strum: "D-DUD-DU",
+    tips: [
+      "Only two chords: C and G7. A perfect very first song.",
+      "C → G7: your fingers move in the same 'direction' — practise it slowly 10 times."
+    ],
+    lyrics: `# Refrão
+[C]Ciranda, cirandinha, vamos todos ciran[G7]dar
+Vamos dar a meia volta, volta e meia vamos [C]dar
+
+# Estrofe 1
+O a[C]nel que tu me deste era vidro e se que[G7]brou
+O amor que tu me tinhas era pouco e se aca[C]bou
+
+# Refrão
+[C]Ciranda, cirandinha, vamos todos ciran[G7]dar
+Vamos dar a meia volta, volta e meia vamos [C]dar
+
+# Estrofe 2
+Por [C]isso, dona Rosa, entre dentro desta [G7]roda
+Diga um verso bem bonito, diga adeus e vá-se em[C]bora`
+  },
+  {
+    id: "peixe-vivo",
+    artist: "brasil-dominio-publico",
+    title: "Peixe Vivo",
+    author: "Tradicional (Minas Gerais)",
+    key: "G", capo: 0, originalKey: "G", bpm: 92, level: 1,
+    strum: "D-DU-UDU",
+    tips: [
+      "G, G7, C and D7 — the same 'family' of chords as many Beatles songs.",
+      "The line 'sem a tua...' repeats D7 → G three times: great practice for that change."
+    ],
+    lyrics: `# Estrofe 1
+Como [G]pode um peixe vivo
+Viver [D7]fora da água [G]fria?
+Como [G]pode um peixe vivo
+Viver [D7]fora da água [G]fria?
+Como pode[G7]rei vi[C]ver
+Como pode[D7]rei vi[G]ver
+Sem a [D7]tua, sem a [G]tua
+Sem a [D7]tua compa[G]nhia?
+
+# Estrofe 2
+Os pas[G]tores desta aldeia
+Já me [D7]fazem zomba[G]ria
+Os pas[G]tores desta aldeia
+Já me [D7]fazem zomba[G]ria
+Por me [G7]verem as[C]sim cho[C]rando
+Por me [D7]verem as[G]sim cho[G]rando
+Sem a [D7]tua, sem a [G]tua
+Sem a [D7]tua compa[G]nhia`
+  },
+  {
+    id: "o-abre-alas",
+    artist: "brasil-dominio-publico",
+    title: "Ó Abre Alas",
+    author: "Chiquinha Gonzaga, 1899",
+    key: "C", capo: 0, originalKey: "C", bpm: 120, level: 1,
+    strum: "D-DUD-DU",
+    tips: [
+      "The first carnival marchinha ever written! Chiquinha Gonzaga died in 1935, so it is public domain.",
+      "Two chords (C and G7) and a strong, marching strum."
+    ],
+    lyrics: `# Marcha
+Ó abre [C]alas, que eu quero pas[G7]sar
+Ó abre [G7]alas, que eu quero pas[C]sar
+Eu sou da [C]Lira, não posso ne[G7]gar
+Eu sou da [G7]Lira, não posso ne[C]gar
+
+# Marcha
+Ó abre [C]alas, que eu quero pas[G7]sar
+Ó abre [G7]alas, que eu quero pas[C]sar
+Rosa de [C]Ouro é que vai ga[G7]nhar
+Rosa de [G7]Ouro é que vai ga[C]nhar`
+  }
+];
+
+PD_SONGS.forEach(s => { s.publicDomain = true; });
+SONGS.push(...PD_SONGS);
 
 </script>
   <script>
@@ -847,6 +1226,10 @@ function escapeHtml(s) {
 
 function songChords(song) {
   const set = [];
+  if (song.lyrics) {
+    for (const m of song.lyrics.matchAll(/\[([^\]]+)\]/g)) if (!set.includes(m[1])) set.push(m[1]);
+    return set;
+  }
   song.sections.forEach(sec => sec.lines.forEach(line =>
     line.split("|").forEach(bar => bar.trim().split(/\s+/).forEach(ch => {
       if (ch && !set.includes(ch)) set.push(ch);
@@ -872,49 +1255,91 @@ function setActiveNav(route) {
   document.querySelectorAll(".nav a").forEach(a => a.classList.toggle("active", a.dataset.route === route));
 }
 
-/* ---------- Home ---------- */
+/* ---------- Home & artist pages ---------- */
+
+const artistById = id => ARTISTS.find(a => a.id === id);
+
+function songMeta(s) {
+  const origin = s.publicDomain ? escapeHtml(s.author) : `${escapeHtml(s.album)} · ${s.year}`;
+  return `${origin} · Key ${s.key}${s.capo ? ` · Capo ${s.capo}` : ""}`;
+}
 
 function renderHome() {
   setActiveNav("home");
-  document.title = "The Beatles — Cifra Online";
-  const query = store.get("query", "");
-  const levelFilter = store.get("levelFilter", 0);
-  const favOnly = store.get("favOnly", false);
-
+  document.title = "Cifra Online — easy guitar chords for beginners";
   app.innerHTML = `
     <section class="hero">
-      <div>
-        <p class="eyebrow">Artist</p>
-        <h1>${ARTIST.name}</h1>
-        <p class="lead">${ARTIST.blurb}</p>
-        <p class="stats"><strong>${SONGS.length}</strong> songs · chord charts, diagrams &amp; strumming patterns</p>
-      </div>
+      <p class="eyebrow">Acoustic guitar for beginners</p>
+      <h1>Learn songs you love, one chord at a time</h1>
+      <p class="lead">Chord diagrams, strumming patterns, transpose &amp; capo. Public-domain songs come with full lyrics.</p>
+      <p class="stats"><strong>${SONGS.length}</strong> songs · <strong>${ARTISTS.length}</strong> artists</p>
     </section>
+    <h2>Artists</h2>
+    <div class="artist-grid">${ARTISTS.map(a => {
+      const n = SONGS.filter(s => s.artist === a.id).length;
+      return `<a class="artist-card" href="#/artist/${a.id}">
+        <span class="artist-name">${escapeHtml(a.name)}</span>
+        <span class="song-meta">${n} songs</span>
+        <span class="artist-note">${escapeHtml(a.note)}</span>
+      </a>`;
+    }).join("")}</div>
+    <h2>All songs</h2>
+    ${songListShell()}
+  `;
+  bindSongList(null);
+}
 
+function renderArtist(id) {
+  const artist = artistById(id);
+  if (!artist) return renderNotFound();
+  setActiveNav("home");
+  document.title = `${artist.name} — Cifra Online`;
+  const n = SONGS.filter(s => s.artist === id).length;
+  app.innerHTML = `
+    <nav class="crumbs"><a href="#/">Home</a> › <span>${escapeHtml(artist.name)}</span></nav>
+    <section class="hero">
+      <p class="eyebrow">Artist</p>
+      <h1>${escapeHtml(artist.name)}</h1>
+      <p class="lead">${escapeHtml(artist.blurb)}</p>
+      <p class="stats"><strong>${n}</strong> songs · ${escapeHtml(artist.note)}</p>
+    </section>
+    ${songListShell()}
+  `;
+  bindSongList(id);
+}
+
+function songListShell() {
+  const levelFilter = store.get("levelFilter", 0);
+  return `
     <section class="filters">
-      <input type="search" id="search" placeholder="Search a song or chord (e.g. “Hey Jude” or “Am”)" value="${escapeHtml(query)}" aria-label="Search songs">
+      <input type="search" id="search" placeholder="Search a song or chord (e.g. “Hey Jude” or “Am”)" value="${escapeHtml(store.get("query", ""))}" aria-label="Search songs">
       <div class="chips" role="group" aria-label="Difficulty">
         ${[[0, "All"], [1, "Beginner"], [2, "Easy"], [3, "Intermediate"]].map(([v, l]) =>
           `<button class="chip ${levelFilter === v ? "on" : ""}" data-level="${v}">${l}</button>`).join("")}
-        <button class="chip ${favOnly ? "on" : ""}" id="favOnly">★ Favourites</button>
+        <button class="chip ${store.get("favOnly", false) ? "on" : ""}" id="favOnly">★ Favourites</button>
+        <button class="chip ${store.get("lyricsOnly", false) ? "on" : ""}" id="lyricsOnly">♪ With lyrics</button>
       </div>
     </section>
+    <section id="songList" class="song-list"></section>`;
+}
 
-    <section id="songList" class="song-list"></section>
-  `;
-
+function bindSongList(artistId) {
   const draw = () => {
     const q = store.get("query", "").trim().toLowerCase();
     const lv = store.get("levelFilter", 0);
     const fo = store.get("favOnly", false);
+    const lo = store.get("lyricsOnly", false);
     const favs = favorites();
     const list = SONGS
+      .filter(s => !artistId || s.artist === artistId)
       .filter(s => !lv || s.level === lv)
       .filter(s => !fo || favs.includes(s.id))
+      .filter(s => !lo || s.publicDomain)
       .filter(s => {
         if (!q) return true;
         const chords = songChords(s).map(c => c.toLowerCase());
-        return s.title.toLowerCase().includes(q) || s.album.toLowerCase().includes(q) || chords.includes(q);
+        const artist = artistById(s.artist).name.toLowerCase();
+        return s.title.toLowerCase().includes(q) || artist.includes(q) || chords.includes(q);
       })
       .sort((a, b) => a.level - b.level || a.title.localeCompare(b.title));
 
@@ -922,8 +1347,8 @@ function renderHome() {
       <a class="song-card" href="#/song/${s.id}">
         <span class="rank">${i + 1}</span>
         <span class="song-main">
-          <span class="song-title">${escapeHtml(s.title)} ${favs.includes(s.id) ? '<span class="star">★</span>' : ""}</span>
-          <span class="song-meta">${escapeHtml(s.album)} · ${s.year} · Key ${s.key}${s.capo ? ` · Capo ${s.capo}` : ""}</span>
+          <span class="song-title">${escapeHtml(s.title)} ${s.publicDomain ? '<span class="badge">Lyrics</span>' : ""} ${favs.includes(s.id) ? '<span class="star">★</span>' : ""}</span>
+          <span class="song-meta">${artistId ? "" : escapeHtml(artistById(s.artist).name) + " · "}${songMeta(s)}</span>
           <span class="chord-pills">${songChords(s).map(c => `<span class="pill">${c}</span>`).join("")}</span>
         </span>
         ${levelDots(s.level)}
@@ -936,12 +1361,14 @@ function renderHome() {
     document.querySelectorAll(".chip[data-level]").forEach(b => b.classList.toggle("on", b === btn));
     draw();
   }));
-  $("#favOnly").addEventListener("click", e => {
-    const v = !store.get("favOnly", false);
-    store.set("favOnly", v);
-    e.currentTarget.classList.toggle("on", v);
-    draw();
-  });
+  for (const key of ["favOnly", "lyricsOnly"]) {
+    $("#" + key).addEventListener("click", e => {
+      const v = !store.get(key, false);
+      store.set(key, v);
+      e.currentTarget.classList.toggle("on", v);
+      draw();
+    });
+  }
   draw();
 }
 
@@ -951,7 +1378,8 @@ function renderSong(id) {
   const song = SONGS.find(s => s.id === id);
   if (!song) return renderNotFound();
   setActiveNav("home");
-  document.title = `${song.title} — ${ARTIST.name} — Cifra Online`;
+  const artist = artistById(song.artist);
+  document.title = `${song.title} — ${artist.name} — Cifra Online`;
 
   const saved = store.get("song:" + id, {});
   const state = {
@@ -959,18 +1387,18 @@ function renderSong(id) {
     capo: saved.capo ?? song.capo,
     scrolling: false,
     speed: store.get("scrollSpeed", 3),
-    view: store.get("view", "chart"),
+    view: song.publicDomain ? "chart" : store.get("view", "chart"),
     editing: false
   };
   const save = () => store.set("song:" + id, { transpose: state.transpose, capo: state.capo });
 
   app.innerHTML = `
-    <nav class="crumbs"><a href="#/">${ARTIST.name}</a> › <span>${escapeHtml(song.title)}</span></nav>
+    <nav class="crumbs"><a href="#/">Home</a> › <a href="#/artist/${artist.id}">${escapeHtml(artist.name)}</a> › <span>${escapeHtml(song.title)}</span></nav>
     <header class="song-header">
       <div>
         <h1>${escapeHtml(song.title)}</h1>
-        <p class="song-artist">${ARTIST.name} · <em>${escapeHtml(song.album)}</em> (${song.year})</p>
-        <p class="song-facts">${levelDots(song.level)} <span>♩ = ${song.bpm}</span> <span>Record key: ${song.originalKey}</span></p>
+        <p class="song-artist"><a href="#/artist/${artist.id}">${escapeHtml(artist.name)}</a> · ${song.publicDomain ? escapeHtml(song.author) : `<em>${escapeHtml(song.album)}</em> (${song.year})`}</p>
+        <p class="song-facts">${levelDots(song.level)} <span>♩ = ${song.bpm}</span> <span>${song.timeSig || "4/4"}</span> <span>Record key: ${song.originalKey}</span></p>
       </div>
       <button class="icon-btn fav ${favorites().includes(id) ? "on" : ""}" id="favBtn" aria-label="Toggle favourite">★</button>
     </header>
@@ -1007,7 +1435,7 @@ function renderSong(id) {
     <p class="sounding" id="sounding"></p>
     ${song.tuning ? `<p class="callout">🎸 ${escapeHtml(song.tuning)}</p>` : ""}
 
-    <div class="view-tabs" role="tablist">
+    <div class="view-tabs" role="tablist" ${song.publicDomain ? "hidden" : ""}>
       <button class="tab" data-view="chart" role="tab">Chord chart</button>
       <button class="tab" data-view="mine" role="tab">My lyrics sheet</button>
     </div>
@@ -1023,13 +1451,15 @@ function renderSong(id) {
           <h2>Strumming</h2>
           <div class="strum" id="strum"></div>
           <button class="btn small" id="playStrum">▶ Hear it</button>
-          <p class="hint">Count “1 &amp; 2 &amp; 3 &amp; 4 &amp;”. Keep your hand moving down-up all the time — only touch the strings on the arrows.</p>
+          <p class="hint">Count “${song.strum.length === 6 ? "1 &amp; 2 &amp; 3 &amp;" : "1 &amp; 2 &amp; 3 &amp; 4 &amp;"}”. Keep your hand moving down-up all the time — only touch the strings on the arrows.</p>
         </section>
         <section class="panel">
           <h2>Tips</h2>
           <ul class="tips">${song.tips.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
         </section>
-        <p class="hint copyright">Lyrics aren't shown for copyright reasons — play along with the recording.</p>
+        <p class="hint copyright">${song.publicDomain
+          ? "Public domain — these lyrics are free to use."
+          : "Lyrics aren't shown for copyright reasons — use “My lyrics sheet” to add your own."}</p>
       </aside>
     </div>
   `;
@@ -1050,6 +1480,7 @@ function renderSong(id) {
     sheet.style.fontSize = prefs.fontSize + "px";
     document.querySelectorAll(".view-tabs .tab").forEach(t => t.classList.toggle("on", t.dataset.view === state.view));
     if (state.view === "mine") drawMySheet(sheet);
+    else if (song.lyrics) sheet.innerHTML = `<div class="cp">${renderChordPro(song.lyrics)}</div>`;
     else sheet.innerHTML = song.sections.map(sec => `
       <section class="section">
         <h3>${escapeHtml(sec.name)} ${sec.repeat ? `<span class="repeat">×${sec.repeat}</span>` : ""}</h3>
@@ -1073,7 +1504,7 @@ function renderSong(id) {
       </button>`;
     }).join("");
 
-    $("#strum").innerHTML = ["1", "&", "2", "&", "3", "&", "4", "&"].map((count, i) => {
+    $("#strum").innerHTML = ["1", "&", "2", "&", "3", "&", "4", "&"].slice(0, song.strum.length).map((count, i) => {
       const s = song.strum[i];
       const arrow = s === "D" ? "↓" : s === "U" ? "↑" : "·";
       return `<span class="beat ${s === "-" ? "rest" : ""}"><b>${arrow}</b><small>${count}</small></span>`;
@@ -1333,6 +1764,7 @@ function route() {
   const parts = hash.split("/").filter(Boolean);
   if (parts.length === 0) renderHome();
   else if (parts[0] === "song" && parts[1]) renderSong(parts[1]);
+  else if (parts[0] === "artist" && parts[1]) renderArtist(parts[1]);
   else if (parts[0] === "chords") renderChords();
   else if (parts[0] === "learn") renderLearn();
   else renderNotFound();
