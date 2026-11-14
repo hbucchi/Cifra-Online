@@ -339,3 +339,13 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .btn:disabled { opacity: .45; cursor: default; border-color: var(--border); }
 #stdBtn:not(:disabled) { background: var(--accent); color: #fff; border-color: var(--accent); }
 @media (orientation: landscape) and (max-height: 540px) { .fb-stage-bar { margin-bottom: 4px; font-size: .82rem; } }
+
+/* Building your own shape */
+.fb-dot.option { opacity: 1 !important; transform: translate(-50%, -50%) scale(1) !important; outline: 2px dashed #fff; outline-offset: 2px; z-index: 2; }
+.fb-row.active-string .fb-strings::before { background: #fde68a; box-shadow: 0 0 6px rgba(253, 230, 138, .8); }
+.fb-row.active-string .fb-note { border-color: #facc15; }
+.fb-shape-info { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 10px 2px 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: .92rem; }
+.fb-shape-info .chord-name { color: var(--chord); font-size: 1.05rem; }
+.fb-shape-btns { display: inline-flex; gap: 6px; margin-left: auto; }
+.ok { color: #059669; font-weight: 600; }
+.fb-edit-hint { margin: 8px 2px 0; }

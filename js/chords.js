@@ -169,38 +169,54 @@ function chordDiagramSVG(name, opts = {}) {
 }
 
 /*
- * Guess a natural fingering for any fret pattern: if the lowest fret is
- * pressed on 2+ strings with nothing lower in between, use a barre (finger 1);
- * the remaining notes get fingers 2, 3, 4 from low fret to high fret.
+ * Suggest fingers for any fret pattern.
+ * Notes on the SAME fret ("column") over neighbouring strings can be pressed
+ * by ONE flat finger (a barre / pestana) — as long as no string under that
+ * finger needs a lower fret or must ring open.
+ *  1. The index finger barres the lowest fret when it can (the classic barre).
+ *  2. If that still needs more than 4 fingers, other columns are barred too
+ *     (e.g. the ring finger across 3 strings in an A-shape barre chord).
+ *  3. Fingers are then numbered from the lowest fret upwards: 1 index … 4 pinky.
  */
 function autoFingering(frets) {
-  const fretted = frets.map((f, s) => ({ f, s })).filter(x => x.f > 0);
   const fingers = frets.map(() => 0);
-  if (!fretted.length) return { frets, fingers, barre: null };
-  const minF = Math.min(...fretted.map(x => x.f));
-  const atMin = fretted.filter(x => x.f === minF).map(x => x.s);
-  let barre = null;
-  if (atMin.length >= 2) {
-    const from = Math.min(...atMin), to = Math.max(...atMin);
-    let ok = true;
-    for (let s = from; s <= to; s++) if (frets[s] < minF) ok = false;
-    if (ok) barre = { fret: minF, from, to };
-  }
+  const groups = new Map(); // fret → strings pressed at that fret
+  frets.forEach((f, s) => { if (f > 0) { if (!groups.has(f)) groups.set(f, []); groups.get(f).push(s); } });
+  const order = [...groups.keys()].sort((a, b) => a - b);
+  const canBarre = F => {
+    const ss = groups.get(F);
+    if (ss.length < 2) return false;
+    for (let s = ss[0]; s <= ss[ss.length - 1]; s++) if (frets[s] < F) return false;
+    return true;
+  };
+  const barred = new Set();
+  if (order.length && canBarre(order[0])) barred.add(order[0]);
+  const count = () => order.reduce((n, F) => n + (barred.has(F) ? 1 : groups.get(F).length), 0);
+  const extra = order.filter(F => !barred.has(F) && canBarre(F))
+    .sort((a, b) => groups.get(b).length - groups.get(a).length || a - b);
+  for (const F of extra) { if (count() <= 4) break; barred.add(F); }
+
   let next = 1;
-  if (barre) { atMin.forEach(s => { fingers[s] = 1; }); next = 2; }
-  fretted
-    .filter(x => !(barre && x.f === minF))
-    .sort((a, b) => a.f - b.f || a.s - b.s)
-    .forEach(x => { fingers[x.s] = Math.min(4, next++); });
-  return { frets, fingers, barre };
+  const barres = [];
+  for (const F of order) {
+    const ss = groups.get(F);
+    if (barred.has(F)) {
+      ss.forEach(s => { fingers[s] = next; });
+      barres.push({ fret: F, from: ss[0], to: ss[ss.length - 1], finger: next });
+      next++;
+    } else ss.forEach(s => { fingers[s] = next++; });
+  }
+  // Fewest fingers possible if every barrable column is pressed by one finger.
+  const minCount = order.reduce((n, F) => n + (canBarre(F) ? 1 : groups.get(F).length), 0);
+  return { frets, fingers, barres, barre: barres[0] || null, count: next - 1, minCount };
 }
 
 function fingeringSVG(f, name, opts = {}) {
   const lefty = !!opts.lefty;
   const frets = lefty ? [...f.frets].reverse() : f.frets;
   const fingers = lefty ? [...f.fingers].reverse() : f.fingers;
-  let barre = f.barre;
-  if (barre && lefty) barre = { fret: barre.fret, from: 5 - barre.to, to: 5 - barre.from };
+  let barres = f.barres || (f.barre ? [f.barre] : []);
+  if (lefty) barres = barres.map(b => ({ fret: b.fret, from: 5 - b.to, to: 5 - b.from }));
 
   const played = frets.filter(x => x > 0);
   const maxFret = played.length ? Math.max(...played) : 0;
@@ -230,12 +246,13 @@ function fingeringSVG(f, name, opts = {}) {
     if (fr === -1) svg += `<text x="${x(s)}" y="${top - 8}" class="mute" text-anchor="middle">×</text>`;
   });
 
-  if (barre) {
+  for (const barre of barres) {
     svg += `<rect x="${x(barre.from) - 6}" y="${y(barre.fret) - 6}" width="${x(barre.to) - x(barre.from) + 12}" height="12" rx="6" class="dot"/>`;
   }
   frets.forEach((fr, s) => {
     if (fr > 0) {
-      const onBarre = barre && fr === barre.fret && s >= barre.from && s <= barre.to;
+      const barre = barres.find(b => fr === b.fret && s >= b.from && s <= b.to);
+      const onBarre = !!barre;
       if (!onBarre) svg += `<circle cx="${x(s)}" cy="${y(fr)}" r="6.5" class="dot"/>`;
       if (fingers[s] && (!onBarre || s === barre.from)) {
         svg += `<text x="${x(s)}" y="${y(fr) + 3.5}" class="finger" text-anchor="middle">${fingers[s]}</text>`;

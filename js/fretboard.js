@@ -151,20 +151,25 @@ function evaluateVoicing(frets, tuning, rootPc, required, minStrings) {
 
   const fretted = played.map(s => frets[s]).filter(f => f > 0);
   const opens = played.length - fretted.length;
-  let fingers = 0, barre = false, minF = 0, maxF = 0;
+  let fingers = 0, minFingers = 0, barre = false, barreCount = 0, minF = 0, maxF = 0, columns = 0;
   if (fretted.length) {
     minF = Math.min(...fretted); maxF = Math.max(...fretted);
     if (maxF - minF > 3) return null;
-    const atMin = played.filter(s => frets[s] === minF);
-    if (atMin.length >= 2) {
-      barre = true;
-      for (let s = atMin[0]; s <= atMin[atMin.length - 1]; s++) if (frets[s] < minF) barre = false;
-    }
-    fingers = barre ? 1 + fretted.filter(f => f > minF).length : fretted.length;
+    // One finger can press several notes on the same fret (barre) — see autoFingering.
+    const plan = autoFingering(frets);
+    fingers = plan.count;
     if (fingers > 4) return null;
+    barreCount = plan.barres.length;
+    barre = plan.barres.some(b => b.fret === minF);
+    columns = new Set(fretted).size; // how many different frets ("columns") the hand covers
+    minFingers = plan.minCount;     // fewest fingers if one finger takes each barrable column
   }
-  const score = minF * 1.4 + (maxF - minF) + fingers * 0.8 - played.length * 1.5 - opens * 0.7 + (barre ? 1.5 : 0) + (inversion ? 4 : 0) + (5 - last) * 1.5; // muting thin strings while strumming is hard
-  return { frets: [...frets], key: frets.join(","), played: played.length, fingers, barre, minF, score, bassPc, inversion };
+  // Lower score = better. Fewer columns and fewer fingers are rewarded, so
+  // shapes where one finger covers several notes rank higher.
+  const score = minF * 1.4 + (maxF - minF) + minFingers * 1.0 + columns * 0.7
+    - played.length * 1.5 - opens * 0.7 + (inversion ? 4 : 0)
+    + (5 - last) * 1.5; // muting thin strings while strumming is hard
+  return { frets: [...frets], key: frets.join(","), played: played.length, fingers, barre, barreCount, columns, minF, score, bassPc, inversion };
 }
 
 // Which chord do the open strings make? (Open tunings are designed for this.)
@@ -199,7 +204,9 @@ function renderTuner() {
     labels: saved.labels || "names",
     showAll: saved.showAll ?? false,
     voicing: 0,
-    focus: null // { pc, midi } — the note the user tapped
+    focus: null, // { pc, midi } — the note the user tapped
+    custom: null, // frets of a shape the user is building by tapping notes
+    activeString: null // string whose options are highlighted
   };
   const FRETS = 15;
   const save = () => store.set("fb", {
@@ -249,6 +256,7 @@ function renderTuner() {
         <button class="btn small" id="stdBtn">↺ Standard tuning (E A D G B E)</button>
       </div>
       <div class="fb-wrap"><div class="fb" id="fb"></div></div>
+      <div id="shapeInfo"></div>
       <div id="focusInfo" class="fb-focus"></div>
       <div id="legend" class="fb-legend"></div>
     </div>
@@ -295,8 +303,14 @@ function renderTuner() {
     return f >= pos && f <= pos + 3 ? f - pos + 1 : null;
   }
   const fingerText = v => v.fingers === 0 ? "No fingers — all open"
-    : v.barre ? `Barre + ${v.fingers - 1} finger${v.fingers - 1 === 1 ? "" : "s"} (${v.fingers} total)`
-    : `${v.fingers} finger${v.fingers === 1 ? "" : "s"}`;
+    : `${v.fingers} finger${v.fingers === 1 ? "" : "s"}` +
+      (v.barreCount ? ` · ${v.barreCount === 1 ? "1 finger presses several notes" : v.barreCount + " fingers press several notes"}` : "");
+
+  // The shape shown on the neck: the user's own, or the selected suggestion.
+  function currentShape() {
+    if (st.custom && st.mode !== "notes") return { frets: st.custom, custom: true };
+    return st.mode === "chord" ? voicings[st.voicing] : null;
+  }
 
   let voicings = [];
 
@@ -374,12 +388,12 @@ function renderTuner() {
     });
     p.querySelectorAll("[data-root]").forEach(b => b.onclick = () => {
       if (isChord) st.chordRoot = Number(b.dataset.root); else { st.scaleRoot = Number(b.dataset.root); st.scalePos = null; }
-      st.voicing = 0; save(); drawAll();
+      st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll();
       if (isChord && voicings[0]) playVoicing(voicings[0]);
     });
     p.querySelectorAll("[data-type]").forEach(b => b.onclick = () => {
       if (isChord) st.chordType = b.dataset.type; else st.scaleType = b.dataset.type;
-      st.voicing = 0; save(); drawAll();
+      st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll();
       if (isChord && voicings[0]) playVoicing(voicings[0]);
     });
     p.querySelectorAll("[data-focus-pc]").forEach(b => b.onclick = () => {
@@ -390,7 +404,7 @@ function renderTuner() {
     // Chords of the scale → jump to chord mode.
     p.querySelectorAll("[data-goto-chord]").forEach(b => b.onclick = () => {
       const [r, t] = b.dataset.gotoChord.split("|");
-      st.mode = "chord"; st.chordRoot = Number(r); st.chordType = t; st.voicing = 0; save(); drawAll();
+      st.mode = "chord"; st.chordRoot = Number(r); st.chordType = t; st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll();
       if (voicings[0]) playVoicing(voicings[0]);
     });
     if ($("#playChord")) $("#playChord").onclick = () => { if (voicings[st.voicing]) playVoicing(voicings[st.voicing]); };
@@ -407,7 +421,7 @@ function renderTuner() {
   function drawFretboard() {
     const a = activeSet();
     const flats = a ? a.flats : false;
-    const v = st.mode === "chord" ? voicings[st.voicing] : null;
+    const v = currentShape();
     const fing = v ? autoFingering(v.frets) : null;
     const fb = $("#fb");
     fb.classList.toggle("lefty", prefs.lefty);
@@ -429,13 +443,15 @@ function renderTuner() {
           cls = "role-" + intervalRole(i);
           if (st.labels === "intervals") label = a.names[i];
           if (v) cls += v.frets[s] === f ? " pick" : " faded";
-          if (fingersMode && st.mode === "chord" && v && v.frets[s] === f) {
+          // Options: the other chord/scale notes on the string the user tapped.
+          if (st.activeString === s && !(v && v.frets[s] === f)) cls += " option";
+          if (fingersMode && v && v.frets[s] === f) {
             // Finger from the same logic as the chord diagrams (1 index … 4 pinky, 0 open).
             const fg = fing;
             label = f === 0 ? "0" : String(fg.fingers[s]);
             cls += " finger" + (f === 0 ? " open-string" : "");
-            if (fg.barre && f === fg.barre.fret && s >= fg.barre.from && s <= fg.barre.to) cls += " barre-note";
-          } else if (fingersMode && st.mode === "scale") {
+            if (fg.barres.some(b => f === b.fret && s >= b.from && s <= b.to)) cls += " barre-note";
+          } else if (fingersMode && st.mode === "scale" && !v) {
             const fg = scaleFinger(f);
             if (fg !== null) { label = String(fg); cls += " finger pick" + (f === 0 ? " open-string" : ""); }
             else cls += " faded";
@@ -450,11 +466,11 @@ function renderTuner() {
           cls += st.focus.midi === m ? " focus focus-exact" : " focus";
         }
         if (label !== null) dot = `<span class="fb-dot ${cls}">${label}</span>`;
-        if (f === 0 && v && v.frets[s] === -1) dot = `<span class="fb-mute">×</span>`;
+        if (f === 0 && v && v.frets[s] === -1 && !(st.activeString === s && a && a.pcs.includes(p))) dot = `<span class="fb-mute">×</span>`;
         cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""}" data-f="${f}">${dot}</div>`);
       }
       rows.push(`
-        <div class="fb-row" data-s="${s}" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">
+        <div class="fb-row ${st.activeString === s ? "active-string" : ""}" data-s="${s}" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">
           <div class="fb-tune">
             <button class="fb-btn" data-tune="1" data-s="${s}" aria-label="Tune string up">+</button>
             <button class="fb-note ${d ? "changed" : ""}" data-open="${s}" title="Play open string">${midiName(open, false)}</button>
@@ -504,7 +520,7 @@ function renderTuner() {
     const name = a.nm(st.chordRoot) + chordType().id;
     const isStandard = st.tuning.every((m, s) => m === STANDARD_TUNING[s]);
     const card = (v, i, small) => `
-      <button class="diagram-card ${i === st.voicing && !small ? "on" : ""}" ${small ? "" : `data-v="${i}"`}
+      <button class="diagram-card ${i === st.voicing && !small && !st.custom ? "on" : ""}" ${small ? "" : `data-v="${i}"`}
         title="${v.inversion ? "Inversion: the lowest note is " + a.nm(v.bassPc) + ", not the root" : ""}">
         <span class="diagram-name">${name}${v.inversion ? "/" + a.nm(v.bassPc) : ""}</span>
         ${fingeringSVG(autoFingering(v.frets), name, { lefty: prefs.lefty })}
@@ -538,10 +554,80 @@ function renderTuner() {
       </div>
       ${compare}`;
     box.querySelectorAll("[data-v]").forEach(b => b.onclick = () => {
-      st.voicing = Number(b.dataset.v);
+      st.voicing = Number(b.dataset.v); st.custom = null; st.activeString = null;
       drawFretboard(); drawVoicings();
       playVoicing(voicings[st.voicing]);
     });
+  }
+
+  /*
+   * Tap a fret. If the note belongs to the chord/scale, it becomes that
+   * string's note in YOUR shape (tap it again to mute the string), and all the
+   * other options on that string light up. Otherwise the note just glows
+   * everywhere it appears on the neck.
+   */
+  function tapCell(s, f) {
+    const m = st.tuning[s] + f;
+    const a = activeSet();
+    if (!a || !a.pcs.includes(pc(m))) return tapNote(m);
+    GuitarAudio.playMidi(m);
+    const sugg = st.mode === "chord" && voicings[st.voicing];
+    const shape = st.custom ? [...st.custom] : sugg ? [...sugg.frets] : [-1, -1, -1, -1, -1, -1];
+    shape[s] = shape[s] === f ? -1 : f;
+    st.custom = shape.every(x => x === -1) ? null : shape;
+    st.activeString = s;
+    st.focus = null;
+    drawFretboard(); drawShapeInfo(); drawFocus();
+    if (st.mode === "chord") drawVoicings();
+  }
+
+  function drawShapeInfo() {
+    const box = $("#shapeInfo");
+    const a = activeSet();
+    if (!a) { box.innerHTML = ""; return; }
+    if (!st.custom) {
+      box.innerHTML = `<p class="hint fb-edit-hint">✎ Tap a ${st.mode} note to build your own shape — the other ${st.mode} notes on that string light up so you can switch. Tap a selected note again to mute that string.</p>`;
+      return;
+    }
+    const frets = st.custom;
+    const played = frets.map((f, s) => (f >= 0 ? s : -1)).filter(s => s >= 0);
+    const midis = played.map(s => st.tuning[s] + frets[s]);
+    const plan = autoFingering(frets);
+    const fretted = frets.filter(f => f > 0);
+    const span = fretted.length ? Math.max(...fretted) - Math.min(...fretted) + 1 : 0;
+    const det = played.length >= 2 ? detectChord(midis) : null;
+    let name = "";
+    if (det) {
+      const sp = spellSet(det.root, det.type.iv, true);
+      const bass = pc(midis[0]);
+      name = sp.get(det.root) + det.type.id + (bass !== det.root ? "/" + (sp.get(bass) || noteName(bass, false)) : "");
+    }
+    const warns = [];
+    if (plan.count > 4) warns.push(`needs ${plan.count} fingers — you only have 4`);
+    if (span > 4) warns.push(`stretches over ${span} frets`);
+    if (played.length && frets.slice(played[0], played[played.length - 1] + 1).some(f => f < 0)) warns.push("a muted string sits between played strings (hard to strum)");
+    if (st.mode === "chord") {
+      const present = new Set(midis.map(pc));
+      const miss = a.pcs.filter(p => !present.has(p)).map(p => a.nm(p));
+      if (miss.length) warns.push(`missing ${miss.join(", ")}`);
+    }
+    box.innerHTML = `
+      <div class="fb-shape-info">
+        <span>✎ <strong>Your shape</strong> <code>${fretsText(frets)}</code>
+          ${name ? `→ <strong class="chord-name">${name}</strong>` : played.length >= 2 ? "→ not a standard chord" : ""}
+          · notes: ${midis.map(m => nameIn(a, m)).join(" ")}
+          · ${plan.count} finger${plan.count === 1 ? "" : "s"}${plan.barres.length ? ` (${plan.barres.length === 1 ? "one presses" : plan.barres.length + " press"} several notes)` : ""}</span>
+        ${warns.length ? `<span class="warn">⚠ ${warns.join(" · ")}</span>` : `<span class="ok">✓ Playable with ${plan.count} finger${plan.count === 1 ? "" : "s"}</span>`}
+        <span class="fb-shape-btns">
+          <button class="btn small" id="playShape">▶ Play</button>
+          <button class="btn small" id="clearShape">${st.mode === "chord" ? "↺ Back to suggested shape" : "Clear shape"}</button>
+        </span>
+      </div>`;
+    $("#playShape").onclick = () => GuitarAudio.strumMidis(frets.map((f, s) => (f < 0 ? null : st.tuning[s] + f)));
+    $("#clearShape").onclick = () => {
+      st.custom = null; st.activeString = null;
+      drawFretboard(); drawShapeInfo(); if (st.mode === "chord") drawVoicings();
+    };
   }
 
   // Tap a note: hear it and highlight every place it lives on the neck.
@@ -612,7 +698,7 @@ function renderTuner() {
     if (st.mode === "chord") voicings = findVoicings(st.tuning, st.chordRoot, chordType().iv);
     else voicings = [];
     if (st.voicing >= voicings.length) st.voicing = 0;
-    drawTuningInfo(); drawPickers(); drawFretboard(); drawFocus(); drawLegend(); drawVoicings();
+    drawTuningInfo(); drawPickers(); drawFretboard(); drawShapeInfo(); drawFocus(); drawLegend(); drawVoicings();
     document.querySelectorAll("[data-labels]").forEach(b => b.classList.toggle("on", b.dataset.labels === st.labels));
     $("#fingersChip").hidden = st.mode === "notes";
     $("#showAll").checked = st.showAll;
@@ -623,7 +709,7 @@ function renderTuner() {
     const target = st.tuning[s] + delta;
     const lo = STANDARD_TUNING[s] - 12, hi = STANDARD_TUNING[s] + 7;
     st.tuning[s] = Math.max(lo, Math.min(hi, target));
-    st.voicing = 0; save(); drawAll();
+    st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll();
     GuitarAudio.playMidi(st.tuning[s]);
   }
 
@@ -631,14 +717,14 @@ function renderTuner() {
   $("#preset").onchange = e => {
     const p = TUNING_PRESETS.find(x => x.id === e.target.value);
     if (!p) return;
-    st.tuning = [...p.notes]; st.voicing = 0; save(); drawAll();
+    st.tuning = [...p.notes]; st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll();
     GuitarAudio.strumMidis(st.tuning);
   };
-  const toStandard = () => { st.tuning = [...STANDARD_TUNING]; st.voicing = 0; save(); drawAll(); GuitarAudio.strumMidis(st.tuning); };
+  const toStandard = () => { st.tuning = [...STANDARD_TUNING]; st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll(); GuitarAudio.strumMidis(st.tuning); };
   $("#resetTuning").onclick = toStandard;
   $("#stdBtn").onclick = toStandard;
   $("#strumOpen").onclick = () => GuitarAudio.strumMidis(st.tuning);
-  document.querySelectorAll(".fb-modes .tab").forEach(t => t.onclick = () => { st.mode = t.dataset.mode; st.voicing = 0; save(); drawAll(); });
+  document.querySelectorAll(".fb-modes .tab").forEach(t => t.onclick = () => { st.mode = t.dataset.mode; st.voicing = 0; st.custom = null; st.activeString = null; save(); drawAll(); });
   document.querySelectorAll("[data-labels]").forEach(b => b.onclick = () => { st.labels = b.dataset.labels; save(); drawAll(); });
   $("#showAll").onchange = e => { st.showAll = e.target.checked; save(); drawAll(); };
   $("#fbLefty").onchange = e => { prefs.lefty = e.target.checked; store.set("lefty", prefs.lefty); drawAll(); };
@@ -691,7 +777,7 @@ function renderTuner() {
       if (steps) retune(d.s, -steps); else drawFretboard();
     } else if (e.type === "pointerup") {
       const cell = d.target.closest(".fb-cell");
-      if (cell) tapNote(st.tuning[d.s] + Number(cell.dataset.f));
+      if (cell) tapCell(d.s, Number(cell.dataset.f));
     }
   };
   fb.addEventListener("pointerup", endDrag);
