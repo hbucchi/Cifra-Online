@@ -147,6 +147,7 @@ function renderJam() {
     scale: saved.scale || null,
     view: ["neck", "box", "shapes"].includes(saved.view) ? saved.view : "shapes",
     shape: saved.shape ?? 0,
+    range: Array.isArray(saved.range) ? saved.range : [0, 15],
     labels: saved.labels || "names"
   };
   const save = () => store.set("jam", st);
@@ -186,6 +187,7 @@ function renderJam() {
         <div class="chips">${[["neck", "Across the neck"], ["box", "One position"], ["shapes", "Shapes"]].map(([v, t]) => `<button class="chip" data-view="${v}">${t}</button>`).join("")}</div>
         <div class="chips">${[["names", "Note names"], ["intervals", "Intervals"], ["fingers", "Fingers ✋"]].map(([v, t]) => `<button class="chip" data-lab="${v}">${t}</button>`).join("")}</div>
       </div>
+      <div id="jamRange">${fretRangeHTML(st.range)}</div>
       <div id="jamShapes"></div>
       <div id="jamNeck"></div>
       <div class="fb-legend" id="jamLegend"></div>
@@ -257,6 +259,7 @@ function renderJam() {
     }
     if (st.view !== "shapes") $("#jamShapes").innerHTML = "";
     cells.forEach(c => {
+      if (!inFretRange(c.f, st.range)) return;          // outside the revealed window
       const k = c.s + ":" + c.f;
       const i = pc(c.m - root);
       const mine = !inShape || inShape(k);
@@ -270,7 +273,7 @@ function renderJam() {
       if (st.labels === "fingers" && mine) cls += " finger";
       dots.set(k, { label, cls });
     });
-    $("#jamNeck").innerHTML = miniNeckHTML(dots, 15, band);
+    $("#jamNeck").innerHTML = miniNeckHTML(dots, 15, band, st.range);
     const chordNotes = currentChord ? chordPcs.map(p => spell.get(p) || noteName(p, keyFlats())).join(" · ") : "";
     $("#jamLegend").innerHTML = `<span class="legend-title"><strong>${spell.get(root)} ${sc.name}</strong>: ${iv.map(i => spell.get(pc(root + i))).join(" · ")}</span>
       <span><i class="fb-dot role-root target"></i> <strong>Target notes</strong> — the notes of the chord playing now${currentChord ? ` (${prettyChord(currentChord)} = ${chordNotes})` : ""}.
@@ -356,6 +359,9 @@ function renderJam() {
   $("#jamTempo").oninput = e => { st.tempo = +e.target.value; $("#jamBpm").textContent = `${Math.round(T().bpm * st.tempo)} BPM`; };
   $("#jamTempo").onchange = () => { save(); restart(); };
   $("#jamVol").oninput = e => JamPlayer.setVolume(+e.target.value);
+  bindFretRange($("#jamRange"), () => st.range, r => {
+    st.range = r; save(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0));
+  });
   $("#jamNeck").addEventListener("click", e => {
     const c = e.target.closest(".fb-cell[data-s]");
     if (c) GuitarAudio.playMidi(STANDARD_TUNING[+c.dataset.s] + +c.dataset.f);

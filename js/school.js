@@ -329,14 +329,15 @@ function schoolFingers(cells) {
 }
 
 /* ---------- Mini neck (display only, tap to hear) ---------- */
-function miniNeckHTML(dots, frets = 15, band = null) {
+function miniNeckHTML(dots, frets = 15, band = null, range = null) {
   const rows = [];
   for (let s = 5; s >= 0; s--) {
     const cells = [];
     for (let f = 0; f <= frets; f++) {
       const d = dots.get(s + ":" + f);
       const inBand = band && f > 0 && f >= band[0] && f <= band[1];
-      cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""}" data-s="${s}" data-f="${f}">${d ? `<span class="fb-dot ${d.cls}">${d.label}</span>` : ""}</div>`);
+      const out = range && !inFretRange(f, range);
+      cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""} ${out ? "out-range" : ""}" data-s="${s}" data-f="${f}">${d ? `<span class="fb-dot ${d.cls}">${d.label}</span>` : ""}</div>`);
     }
     rows.push(`<div class="fb-row" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">
       <div class="fb-tune"><span class="fb-note mini">${noteName(STANDARD_TUNING[s], false)}</span></div>

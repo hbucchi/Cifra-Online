@@ -224,3 +224,50 @@ function oneOctave(rootPc, iv, tuning = STANDARD_TUNING, maxFret = 15) {
   const start = tuning[0] + pc(rootPc - tuning[0]);
   return shape.cells.filter(c => c.m >= start && c.m <= start + 12);
 }
+
+/* ---------- Fret range ("reveal window") slider, shared by the Fretboard and the Jam room ---------- */
+
+// Two-handle slider: frets lo..hi are revealed, the rest of the neck is hidden.
+// ◀ ▶ slide the whole window along the neck keeping its width.
+function fretRangeHTML(range, maxFret = 15) {
+  const [lo, hi] = range;
+  const pct = f => (f / maxFret) * 100;
+  return `<div class="fret-range" data-fret-range>
+    <span class="tool-label">Show frets</span>
+    <button class="chip" data-fr="left" aria-label="Slide window towards the nut">◀</button>
+    <div class="dual">
+      <div class="dual-track"></div>
+      <div class="dual-fill" style="left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%"></div>
+      <input type="range" min="0" max="${maxFret}" step="1" value="${lo}" data-fr="lo" aria-label="From fret">
+      <input type="range" min="0" max="${maxFret}" step="1" value="${hi}" data-fr="hi" aria-label="To fret">
+    </div>
+    <button class="chip" data-fr="right" aria-label="Slide window towards the body">▶</button>
+    <strong class="fr-label">${lo === 0 ? "open" : lo}–${hi}</strong>
+    <button class="chip" data-fr="all">Whole neck</button>
+  </div>`;
+}
+
+// Wire a slider rendered by fretRangeHTML. getRange() → [lo, hi]; onChange([lo, hi]) on every move.
+function bindFretRange(container, getRange, onChange, maxFret = 15) {
+  const box = container.querySelector("[data-fret-range]");
+  if (!box) return;
+  const loIn = box.querySelector('[data-fr="lo"]'), hiIn = box.querySelector('[data-fr="hi"]');
+  const paint = ([lo, hi]) => {
+    loIn.value = lo; hiIn.value = hi;
+    const fill = box.querySelector(".dual-fill");
+    fill.style.left = (lo / maxFret) * 100 + "%";
+    fill.style.width = ((hi - lo) / maxFret) * 100 + "%";
+    box.querySelector(".fr-label").textContent = `${lo === 0 ? "open" : lo}–${hi}`;
+  };
+  const set = r => { paint(r); onChange(r); };
+  loIn.oninput = () => { const hi = getRange()[1]; set([Math.min(+loIn.value, hi), hi]); };
+  hiIn.oninput = () => { const lo = getRange()[0]; set([lo, Math.max(+hiIn.value, lo)]); };
+  box.querySelectorAll("button[data-fr]").forEach(b => b.onclick = () => {
+    const [lo, hi] = getRange(), w = hi - lo;
+    if (b.dataset.fr === "all") set([0, maxFret]);
+    if (b.dataset.fr === "left") { const nlo = Math.max(0, lo - 1); set([nlo, nlo + w]); }
+    if (b.dataset.fr === "right") { const nhi = Math.min(maxFret, hi + 1); set([nhi - w, nhi]); }
+  });
+}
+
+const inFretRange = (f, range) => !range || (f >= range[0] && f <= range[1]);

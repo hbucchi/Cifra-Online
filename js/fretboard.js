@@ -223,6 +223,7 @@ function renderTuner() {
     scalePos: saved.scalePos ?? null, // hand position for scale fingering (fret of finger 1)
     scaleView: saved.scaleView || "shapes", // "neck" | "pattern" | "shapes" | "octave" | "all"
     scaleShape: saved.scaleShape ?? 0,      // which hand-position shape is selected
+    fretRange: Array.isArray(saved.fretRange) ? saved.fretRange : [0, 15], // revealed frets (scale mode)
     labels: saved.labels || "names",
     showAll: saved.showAll ?? false,
     voicing: 0,
@@ -233,7 +234,7 @@ function renderTuner() {
   const FRETS = 15;
   const save = () => store.set("fb", {
     tuning: st.tuning, mode: st.mode, chordRoot: st.chordRoot, chordType: st.chordType,
-    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, scaleView: st.scaleView, scaleShape: st.scaleShape, labels: st.labels, showAll: st.showAll
+    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, scaleView: st.scaleView, scaleShape: st.scaleShape, fretRange: st.fretRange, labels: st.labels, showAll: st.showAll
   });
 
   app.innerHTML = `
@@ -436,11 +437,13 @@ function renderTuner() {
       ${!isChord && st.scaleView === "pattern" ? `<p class="hint">The root's shape: the hand position that starts on the root on the 6th string. Every note within reach, one finger per fret.</p>` : ""}
       ${!isChord && st.scaleView === "shapes" ? shapesHTML(a) : ""}
       ${!isChord && st.labels === "fingers" && st.scaleView === "all" ? positionsHTML() : ""}
+      ${isChord ? "" : fretRangeHTML(st.fretRange, FRETS)}
       ${isChord ? "" : scaleChordsHTML(a)}
     `;
     p.querySelectorAll("[data-view]").forEach(b => b.onclick = () => {
       st.scaleView = b.dataset.view; st.custom = null; st.activeString = null; save(); drawPickers(); drawFretboard(); drawShapeInfo();
     });
+    if (!isChord) bindFretRange(p, () => st.fretRange, r => { st.fretRange = r; save(); drawFretboard(); }, FRETS);
     p.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => {
       const n = scalePattern(activeSet()).shapes.length, v = b.dataset.shape;
       st.scaleShape = v === "prev" ? (st.scaleShape + n - 1) % n : v === "next" ? (st.scaleShape + 1) % n : Number(v);
@@ -506,7 +509,8 @@ function renderTuner() {
         let cls = "";
         let label = nameIn(a, p);
         const fingersMode = st.labels === "fingers" && a;
-        const inSet = a && a.pcs.includes(p) && (!pat || v || pat.has(s, f));
+        const revealed = st.mode !== "scale" || inFretRange(f, st.fretRange);
+        const inSet = a && revealed && a.pcs.includes(p) && (!pat || v || pat.has(s, f));
         if (!a) {
           cls = (flats ? FLATS : SHARPS)[p].length === 1 ? "natural" : "accidental";
         } else if (inSet) {
@@ -543,7 +547,7 @@ function renderTuner() {
         if (label !== null) dot = `<span class="fb-dot ${cls}">${label}</span>`;
         if (f === 0 && v && v.frets[s] === -1 && !(st.activeString === s && a && a.pcs.includes(p))) dot = `<span class="fb-mute">×</span>`;
         const inBand = pat && pat.band && !v && f >= pat.band[0] && f <= pat.band[1] && f > 0;
-        cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""}" data-f="${f}">${dot}</div>`);
+        cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""} ${revealed ? "" : "out-range"}" data-f="${f}">${dot}</div>`);
       }
       rows.push(`
         <div class="fb-row ${st.activeString === s ? "active-string" : ""}" data-s="${s}" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">

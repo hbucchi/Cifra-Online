@@ -436,6 +436,21 @@ code { background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; }
 .fb-row:nth-last-child(2) .fb-cell.in-band { box-shadow: inset 0 -3px 0 rgba(253, 230, 138, .9); }
 .fb-pos .chip small { opacity: .7; font-weight: 500; }
 
+/* Fret range ("reveal window") slider */
+.fret-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 8px 0; }
+.fret-range .fr-label { min-width: 4.5em; color: var(--chord); }
+.dual { position: relative; width: min(340px, 70vw); height: 28px; }
+.dual-track, .dual-fill { position: absolute; top: 12px; height: 4px; border-radius: 4px; }
+.dual-track { left: 0; right: 0; background: var(--border); }
+.dual-fill { background: var(--accent); }
+.dual input[type=range] { position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; height: 28px; }
+.dual input[type=range]::-webkit-slider-runnable-track { background: none; height: 28px; }
+.dual input[type=range]::-moz-range-track { background: none; }
+.dual input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 22px; height: 22px; margin-top: 3px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); cursor: grab; box-shadow: var(--shadow); }
+.dual input[type=range]::-moz-range-thumb { pointer-events: auto; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); cursor: grab; }
+.fb-cell.out-range { background: rgba(0, 0, 0, .38); }
+.fb-cell.out-range.open { background: rgba(0, 0, 0, .12); }
+
 </style>
 </head>
 <body>
@@ -1057,6 +1072,7 @@ function renderTuner() {
     scalePos: saved.scalePos ?? null, // hand position for scale fingering (fret of finger 1)
     scaleView: saved.scaleView || "shapes", // "neck" | "pattern" | "shapes" | "octave" | "all"
     scaleShape: saved.scaleShape ?? 0,      // which hand-position shape is selected
+    fretRange: Array.isArray(saved.fretRange) ? saved.fretRange : [0, 15], // revealed frets (scale mode)
     labels: saved.labels || "names",
     showAll: saved.showAll ?? false,
     voicing: 0,
@@ -1067,7 +1083,7 @@ function renderTuner() {
   const FRETS = 15;
   const save = () => store.set("fb", {
     tuning: st.tuning, mode: st.mode, chordRoot: st.chordRoot, chordType: st.chordType,
-    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, scaleView: st.scaleView, scaleShape: st.scaleShape, labels: st.labels, showAll: st.showAll
+    scaleRoot: st.scaleRoot, scaleType: st.scaleType, scalePos: st.scalePos, scaleView: st.scaleView, scaleShape: st.scaleShape, fretRange: st.fretRange, labels: st.labels, showAll: st.showAll
   });
 
   app.innerHTML = `
@@ -1270,11 +1286,13 @@ function renderTuner() {
       ${!isChord && st.scaleView === "pattern" ? `<p class="hint">The root's shape: the hand position that starts on the root on the 6th string. Every note within reach, one finger per fret.</p>` : ""}
       ${!isChord && st.scaleView === "shapes" ? shapesHTML(a) : ""}
       ${!isChord && st.labels === "fingers" && st.scaleView === "all" ? positionsHTML() : ""}
+      ${isChord ? "" : fretRangeHTML(st.fretRange, FRETS)}
       ${isChord ? "" : scaleChordsHTML(a)}
     `;
     p.querySelectorAll("[data-view]").forEach(b => b.onclick = () => {
       st.scaleView = b.dataset.view; st.custom = null; st.activeString = null; save(); drawPickers(); drawFretboard(); drawShapeInfo();
     });
+    if (!isChord) bindFretRange(p, () => st.fretRange, r => { st.fretRange = r; save(); drawFretboard(); }, FRETS);
     p.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => {
       const n = scalePattern(activeSet()).shapes.length, v = b.dataset.shape;
       st.scaleShape = v === "prev" ? (st.scaleShape + n - 1) % n : v === "next" ? (st.scaleShape + 1) % n : Number(v);
@@ -1340,7 +1358,8 @@ function renderTuner() {
         let cls = "";
         let label = nameIn(a, p);
         const fingersMode = st.labels === "fingers" && a;
-        const inSet = a && a.pcs.includes(p) && (!pat || v || pat.has(s, f));
+        const revealed = st.mode !== "scale" || inFretRange(f, st.fretRange);
+        const inSet = a && revealed && a.pcs.includes(p) && (!pat || v || pat.has(s, f));
         if (!a) {
           cls = (flats ? FLATS : SHARPS)[p].length === 1 ? "natural" : "accidental";
         } else if (inSet) {
@@ -1377,7 +1396,7 @@ function renderTuner() {
         if (label !== null) dot = `<span class="fb-dot ${cls}">${label}</span>`;
         if (f === 0 && v && v.frets[s] === -1 && !(st.activeString === s && a && a.pcs.includes(p))) dot = `<span class="fb-mute">×</span>`;
         const inBand = pat && pat.band && !v && f >= pat.band[0] && f <= pat.band[1] && f > 0;
-        cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""}" data-f="${f}">${dot}</div>`);
+        cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""} ${revealed ? "" : "out-range"}" data-f="${f}">${dot}</div>`);
       }
       rows.push(`
         <div class="fb-row ${st.activeString === s ? "active-string" : ""}" data-s="${s}" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">
@@ -1979,6 +1998,53 @@ function oneOctave(rootPc, iv, tuning = STANDARD_TUNING, maxFret = 15) {
   return shape.cells.filter(c => c.m >= start && c.m <= start + 12);
 }
 
+/* ---------- Fret range ("reveal window") slider, shared by the Fretboard and the Jam room ---------- */
+
+// Two-handle slider: frets lo..hi are revealed, the rest of the neck is hidden.
+// ◀ ▶ slide the whole window along the neck keeping its width.
+function fretRangeHTML(range, maxFret = 15) {
+  const [lo, hi] = range;
+  const pct = f => (f / maxFret) * 100;
+  return `<div class="fret-range" data-fret-range>
+    <span class="tool-label">Show frets</span>
+    <button class="chip" data-fr="left" aria-label="Slide window towards the nut">◀</button>
+    <div class="dual">
+      <div class="dual-track"></div>
+      <div class="dual-fill" style="left:${pct(lo)}%;width:${pct(hi) - pct(lo)}%"></div>
+      <input type="range" min="0" max="${maxFret}" step="1" value="${lo}" data-fr="lo" aria-label="From fret">
+      <input type="range" min="0" max="${maxFret}" step="1" value="${hi}" data-fr="hi" aria-label="To fret">
+    </div>
+    <button class="chip" data-fr="right" aria-label="Slide window towards the body">▶</button>
+    <strong class="fr-label">${lo === 0 ? "open" : lo}–${hi}</strong>
+    <button class="chip" data-fr="all">Whole neck</button>
+  </div>`;
+}
+
+// Wire a slider rendered by fretRangeHTML. getRange() → [lo, hi]; onChange([lo, hi]) on every move.
+function bindFretRange(container, getRange, onChange, maxFret = 15) {
+  const box = container.querySelector("[data-fret-range]");
+  if (!box) return;
+  const loIn = box.querySelector('[data-fr="lo"]'), hiIn = box.querySelector('[data-fr="hi"]');
+  const paint = ([lo, hi]) => {
+    loIn.value = lo; hiIn.value = hi;
+    const fill = box.querySelector(".dual-fill");
+    fill.style.left = (lo / maxFret) * 100 + "%";
+    fill.style.width = ((hi - lo) / maxFret) * 100 + "%";
+    box.querySelector(".fr-label").textContent = `${lo === 0 ? "open" : lo}–${hi}`;
+  };
+  const set = r => { paint(r); onChange(r); };
+  loIn.oninput = () => { const hi = getRange()[1]; set([Math.min(+loIn.value, hi), hi]); };
+  hiIn.oninput = () => { const lo = getRange()[0]; set([lo, Math.max(+hiIn.value, lo)]); };
+  box.querySelectorAll("button[data-fr]").forEach(b => b.onclick = () => {
+    const [lo, hi] = getRange(), w = hi - lo;
+    if (b.dataset.fr === "all") set([0, maxFret]);
+    if (b.dataset.fr === "left") { const nlo = Math.max(0, lo - 1); set([nlo, nlo + w]); }
+    if (b.dataset.fr === "right") { const nhi = Math.min(maxFret, hi + 1); set([nhi - w, nhi]); }
+  });
+}
+
+const inFretRange = (f, range) => !range || (f >= range[0] && f <= range[1]);
+
 </script>
   <script>
 /*
@@ -2312,14 +2378,15 @@ function schoolFingers(cells) {
 }
 
 /* ---------- Mini neck (display only, tap to hear) ---------- */
-function miniNeckHTML(dots, frets = 15, band = null) {
+function miniNeckHTML(dots, frets = 15, band = null, range = null) {
   const rows = [];
   for (let s = 5; s >= 0; s--) {
     const cells = [];
     for (let f = 0; f <= frets; f++) {
       const d = dots.get(s + ":" + f);
       const inBand = band && f > 0 && f >= band[0] && f <= band[1];
-      cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""}" data-s="${s}" data-f="${f}">${d ? `<span class="fb-dot ${d.cls}">${d.label}</span>` : ""}</div>`);
+      const out = range && !inFretRange(f, range);
+      cells.push(`<div class="fb-cell ${f === 0 ? "open" : ""} ${inBand ? "in-band" : ""} ${out ? "out-range" : ""}" data-s="${s}" data-f="${f}">${d ? `<span class="fb-dot ${d.cls}">${d.label}</span>` : ""}</div>`);
     }
     rows.push(`<div class="fb-row" style="--thick:${(1 + (5 - s) * 0.45).toFixed(2)}px">
       <div class="fb-tune"><span class="fb-note mini">${noteName(STANDARD_TUNING[s], false)}</span></div>
@@ -2776,6 +2843,7 @@ function renderJam() {
     scale: saved.scale || null,
     view: ["neck", "box", "shapes"].includes(saved.view) ? saved.view : "shapes",
     shape: saved.shape ?? 0,
+    range: Array.isArray(saved.range) ? saved.range : [0, 15],
     labels: saved.labels || "names"
   };
   const save = () => store.set("jam", st);
@@ -2815,6 +2883,7 @@ function renderJam() {
         <div class="chips">${[["neck", "Across the neck"], ["box", "One position"], ["shapes", "Shapes"]].map(([v, t]) => `<button class="chip" data-view="${v}">${t}</button>`).join("")}</div>
         <div class="chips">${[["names", "Note names"], ["intervals", "Intervals"], ["fingers", "Fingers ✋"]].map(([v, t]) => `<button class="chip" data-lab="${v}">${t}</button>`).join("")}</div>
       </div>
+      <div id="jamRange">${fretRangeHTML(st.range)}</div>
       <div id="jamShapes"></div>
       <div id="jamNeck"></div>
       <div class="fb-legend" id="jamLegend"></div>
@@ -2886,6 +2955,7 @@ function renderJam() {
     }
     if (st.view !== "shapes") $("#jamShapes").innerHTML = "";
     cells.forEach(c => {
+      if (!inFretRange(c.f, st.range)) return;          // outside the revealed window
       const k = c.s + ":" + c.f;
       const i = pc(c.m - root);
       const mine = !inShape || inShape(k);
@@ -2899,7 +2969,7 @@ function renderJam() {
       if (st.labels === "fingers" && mine) cls += " finger";
       dots.set(k, { label, cls });
     });
-    $("#jamNeck").innerHTML = miniNeckHTML(dots, 15, band);
+    $("#jamNeck").innerHTML = miniNeckHTML(dots, 15, band, st.range);
     const chordNotes = currentChord ? chordPcs.map(p => spell.get(p) || noteName(p, keyFlats())).join(" · ") : "";
     $("#jamLegend").innerHTML = `<span class="legend-title"><strong>${spell.get(root)} ${sc.name}</strong>: ${iv.map(i => spell.get(pc(root + i))).join(" · ")}</span>
       <span><i class="fb-dot role-root target"></i> <strong>Target notes</strong> — the notes of the chord playing now${currentChord ? ` (${prettyChord(currentChord)} = ${chordNotes})` : ""}.
@@ -2985,6 +3055,9 @@ function renderJam() {
   $("#jamTempo").oninput = e => { st.tempo = +e.target.value; $("#jamBpm").textContent = `${Math.round(T().bpm * st.tempo)} BPM`; };
   $("#jamTempo").onchange = () => { save(); restart(); };
   $("#jamVol").oninput = e => JamPlayer.setVolume(+e.target.value);
+  bindFretRange($("#jamRange"), () => st.range, r => {
+    st.range = r; save(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0));
+  });
   $("#jamNeck").addEventListener("click", e => {
     const c = e.target.closest(".fb-cell[data-s]");
     if (c) GuitarAudio.playMidi(STANDARD_TUNING[+c.dataset.s] + +c.dataset.f);
