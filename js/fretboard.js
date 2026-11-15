@@ -443,7 +443,10 @@ function renderTuner() {
     p.querySelectorAll("[data-view]").forEach(b => b.onclick = () => {
       st.scaleView = b.dataset.view; st.custom = null; st.activeString = null; save(); drawPickers(); drawFretboard(); drawShapeInfo();
     });
-    if (!isChord) bindFretRange(p, () => st.fretRange, r => { st.fretRange = r; save(); drawFretboard(); }, FRETS);
+    if (!isChord) bindFretRange(p, () => st.fretRange, r => { st.fretRange = r; save(); drawFretboard(); }, FRETS, () => {
+      // "One position" / "One octave" only ever show one shape — switch to Shapes so the whole neck fills up.
+      if (st.scaleView === "pattern" || st.scaleView === "octave") { st.scaleView = "shapes"; st.scaleShape = 0; save(); drawPickers(); drawFretboard(); }
+    });
     p.querySelectorAll("[data-shape]").forEach(b => b.onclick = () => {
       const n = scalePattern(activeSet()).shapes.length, v = b.dataset.shape;
       st.scaleShape = v === "prev" ? (st.scaleShape + n - 1) % n : v === "next" ? (st.scaleShape + 1) % n : Number(v);

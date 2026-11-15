@@ -361,6 +361,9 @@ function renderJam() {
   $("#jamVol").oninput = e => JamPlayer.setVolume(+e.target.value);
   bindFretRange($("#jamRange"), () => st.range, r => {
     st.range = r; save(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0));
+  }, 15, () => {
+    // "One position" only ever shows one hand shape — show the whole neck's notes instead.
+    if (st.view === "box") { st.view = "shapes"; st.shape = 0; save(); drawControls(); drawNeck(JamPlayer.playing ? chordAt(lastBar) : chordAt(0)); }
   });
   $("#jamNeck").addEventListener("click", e => {
     const c = e.target.closest(".fb-cell[data-s]");

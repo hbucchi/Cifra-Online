@@ -243,12 +243,13 @@ function fretRangeHTML(range, maxFret = 15) {
     </div>
     <button class="chip" data-fr="right" aria-label="Slide window towards the body">▶</button>
     <strong class="fr-label">${lo === 0 ? "open" : lo}–${hi}</strong>
-    <button class="chip" data-fr="all">Whole neck</button>
+    <button class="chip ${lo === 0 && hi === maxFret ? "on" : ""}" data-fr="all" title="Show the scale on all frets">Whole neck</button>
   </div>`;
 }
 
 // Wire a slider rendered by fretRangeHTML. getRange() → [lo, hi]; onChange([lo, hi]) on every move.
-function bindFretRange(container, getRange, onChange, maxFret = 15) {
+// onWholeNeck (optional) runs after "Whole neck" — e.g. to leave a single-shape view.
+function bindFretRange(container, getRange, onChange, maxFret = 15, onWholeNeck = null) {
   const box = container.querySelector("[data-fret-range]");
   if (!box) return;
   const loIn = box.querySelector('[data-fr="lo"]'), hiIn = box.querySelector('[data-fr="hi"]');
@@ -258,13 +259,14 @@ function bindFretRange(container, getRange, onChange, maxFret = 15) {
     fill.style.left = (lo / maxFret) * 100 + "%";
     fill.style.width = ((hi - lo) / maxFret) * 100 + "%";
     box.querySelector(".fr-label").textContent = `${lo === 0 ? "open" : lo}–${hi}`;
+    box.querySelector('[data-fr="all"]').classList.toggle("on", lo === 0 && hi === maxFret);
   };
   const set = r => { paint(r); onChange(r); };
   loIn.oninput = () => { const hi = getRange()[1]; set([Math.min(+loIn.value, hi), hi]); };
   hiIn.oninput = () => { const lo = getRange()[0]; set([lo, Math.max(+hiIn.value, lo)]); };
   box.querySelectorAll("button[data-fr]").forEach(b => b.onclick = () => {
     const [lo, hi] = getRange(), w = hi - lo;
-    if (b.dataset.fr === "all") set([0, maxFret]);
+    if (b.dataset.fr === "all") { set([0, maxFret]); if (onWholeNeck) onWholeNeck(); }
     if (b.dataset.fr === "left") { const nlo = Math.max(0, lo - 1); set([nlo, nlo + w]); }
     if (b.dataset.fr === "right") { const nhi = Math.min(maxFret, hi + 1); set([nhi - w, nhi]); }
   });
